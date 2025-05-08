@@ -365,7 +365,7 @@ export function editGearLogic(context is Context, id is Id, oldDefinition is map
 
 const TEETH_BOUNDS =
 {
-            (unitless) : [4, 25, 250]
+            (unitless) : [4, 25, 1000]
         } as IntegerBoundSpec;
 
 const PRESSURE_ANGLE_BOUNDS =
