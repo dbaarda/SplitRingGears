@@ -42,6 +42,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         annotation { "Name" : "Chamfer", "Default" : false }
         definition.chamfer is boolean;
 
+        // Copied from the Chamfer feature
         if (definition.chamfer)
         {
             annotation { "Name" : "Chamfer type", "Default" : GearChamferType.OFFSET_ANGLE }
@@ -214,8 +215,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
             // center hole circle sketch
             skCircle(gearSketch, "Center", {
                         "center" : center,
-                        "radius" : definition.centerHoleDia / 2
-                    });
+                        "radius" : definition.centerHoleDia / 2 });
         }
         skSolve(gearSketch);
 
@@ -223,8 +223,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                     "entities" : qSketchRegion(id + "gearSketch", true),
                     "direction" : sketchPlane.normal * (definition.flipGear ? -1 : 1),
                     "endBound" : BoundingType.BLIND,
-                    "endDepth" : definition.gearDepth
-                });
+                    "endDepth" : definition.gearDepth });
 
         if (definition.chamfer)
         {
@@ -279,7 +278,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
 
         skCircle(toothSketch, "addendum", { "center" : center, "radius" : definition.pitchCircleDiameter / 2 + addendum });
         skCircle(toothSketch, "dedendum", { "center" : center, "radius" : definition.pitchCircleDiameter / 2 - dedendum });
-        skCircle(toothSketch, "fillet", { "center" : regionPoint, "radius" : 1 * millimeter, "construction" : true });
+        skCircle(toothSketch, "fillet", { "center" : regionPoint, "radius" : 0.1 * millimeter, "construction" : true });
 
         skConstraint(toothSketch, "fix1", { "constraintType" : ConstraintType.FIX, "localFirst" : "dedendum" });
         skConstraint(toothSketch, "fix2", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline1" });
@@ -294,8 +293,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                     "entities" : qContainsPoint(qCreatedBy(id + "toothSketch", EntityType.FACE), planeToWorld(sketchPlane, regionPoint)),
                     "direction" : sketchPlane.normal * (definition.flipGear ? -1 : 1),
                     "endBound" : BoundingType.BLIND,
-                    "endDepth" : definition.gearDepth
-                });
+                    "endDepth" : definition.gearDepth });
 
         const filletEdges = qClosestTo(qGeometry(qCreatedBy(id + "tooth", EntityType.EDGE), GeometryType.LINE), location);
 
@@ -329,14 +327,12 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         opPattern(context, id + "pattern", {
                     "entities" : tools,
                     "transforms" : transforms,
-                    "instanceNames" : instanceNames
-                });
+                    "instanceNames" : instanceNames });
 
         opBoolean(context, id + "hobbed", {
                     "tools" : qUnion([tools, qCreatedBy(id + "pattern", EntityType.BODY)]),
                     "targets" : qCreatedBy(id + "extrude1", EntityType.BODY),
-                    "operationType" : BooleanOperationType.SUBTRACTION
-                });
+                    "operationType" : BooleanOperationType.SUBTRACTION });
 
         // Remove sketch entities - no longer required
         opDeleteBodies(context, id + "delete", { "entities" : qUnion([qCreatedBy(id + "gearSketch"), qCreatedBy(id + "toothSketch")]) });
@@ -347,8 +343,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         skCircle(PCDSketch, "PCD", {
                     "center" : center,
                     "radius" : definition.pitchCircleDiameter / 2,
-                    "construction" : true
-                });
+                    "construction" : true });
 
         skSolve(PCDSketch);
 
