@@ -67,7 +67,7 @@ We also require that the sun gear is in the centre, and the planets can fit
 around it, so the ring diameter is equal to the sun diameter plus two planet
 diameters;
 
-```
+```python
   Tr = Ts + 2*Tp
 ```
 
@@ -75,7 +75,7 @@ Note that since Tp is integer, this means `Tr - Ts` must be even, which is the
 same as also requiring Ts+Tr be even, or that Ts and Tr are either both odd or
 both even. So we can express this constraint in various ways;
 
-```
+```python
   (Ts + Tr) % Np = 0     # (1) the original constraint for gear meshing.
   (Ts + Tr) % 2 = 0      # (2) the both even or odd constraint.
   2*(Ts + Tp) % Np = 0   # writing (1) with Ts and Tp implying (2)
@@ -113,20 +113,20 @@ Pp = Tr/Np%1
    = (-Ts%Np)/Np   # since (Ts+Tr)%Np=0
 ```
 
-Note that if Ts%Np=1, then each planet will be engaging the sun 1/Np of a
-"tooth phase" offset from each other. In general, if Tr and Np is coprime,
+Note that if `Ts%Np=1`, then each planet will be engaging the sun `1/Np` of a
+"tooth phase" offset from each other. In general, if `Tr` and `Np` is coprime,
 then every planet will engage with the ring and sun gear with a different
 phase, and thus engage/disengage at different times. This should ensure
 smoother tooth loading for less noise and wear, and might combine for less
 backlash. However it does mean the loads are not perfectly symetrical, which
 might induce extra oscilations and cause more bearing wear.
 
-Alternatively if Np is a factor of Tr, then all planets engage the ring (and
+Alternatively if `Np` is a factor of `Tr`, then all planets engage the ring (and
 sun) with the same phase angle, making the loads perfectly symetrical, which
 should reduce the bearing loads.
 
 A compromise would be to have only opposite side planets mesh with the same
-phase. For even Np, this would mean having `gcd(Tr,Np)=2`. In the general case
+phase. For even `Np`, this would mean having `gcd(Tr,Np)=2`. In the general case
 it works out as `min(Tr*(Np//2)%Np,-Tr*(Np//2)%Np)<=1 and gcd(Tr,Np)<=2`
 
 These result in various hard and optional constraints for the gear sizes. Hard
@@ -179,14 +179,13 @@ Additional optional constraints are;
   same as **rnf**, for Np=3 it's the same as **rnc**, and for larger Np
   it's a looser constraint than **rnf** but tighter than **rnc**.
 
-Note that **pgs** `Tr=Ts+2*Tp` means that if **rpc** `Tr` and `Tp` are
-coprime, then **psc** `Tp` and `Ts` are also coprime, and `gcd(Tr,Ts)<=2`. So
-`Tr` and `Ts` are either also coprime, or are both even and `Tr/2` and `Ts/2`
-are coprime.
+Note that **pgs** (`Tr=Ts+2*Tp`) means that if **rpc** (`iscoprime(Tr,Tp)`),
+then `Tp` and `Ts` are also coprime, and `gcd(Tr,Ts)<=2`. So `Tr` and `Ts` are
+either also coprime, or are both even and `Tr/2` and `Ts/2` are coprime.
 
-Also **rsm** `(Tr+Ts)%Np=0` means that `Tr+Ts` must have `Np` as a factor, and
-`Tr` and `Ts` either both have, or both don't have, `Np` as a factor. When
-**rpc** `Tr` and `Tp` are coprime we know that `gcd(Tr,Ts)<=2`, which means
+Also **rsm** (`(Tr+Ts)%Np=0`) means that `Tr+Ts` must have `Np` as a factor,
+and `Tr` and `Ts` either both have, or both don't have, `Np` as a factor. When
+**rpc** (`iscoprime(Tr,Tp)`) we know that `gcd(Tr,Ts)<=2`, which means
 `gcd(Tr+Ts,Tr,Ts)<=2`, which means `gcd(Np,Tr,Ts)<=2`. This means when `Tr`
 and `Tp` are coprime, `Tr`, `Ts` and `Np` are either all coprime, or they are
 all even and `Tr/2`, `Ts/2` and `Np/2` are all coprime. So `Np` can only be a
