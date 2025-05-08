@@ -1,19 +1,8 @@
-/*
-    Spur Gear - Neil Cooke, Onshape Inc.
+FeatureScript 1096;
+import(path : "onshape/std/common.fs", version : "1096.0");
+icon::import(path : "84e649fcf78ef2cf627fcf5e", version : "4adb2fbb86b2ebf683c17b68");
 
-    This custom feature creates mathematically correct
-    spur gears with optional center bore hole and keyway.
-
-    Version 1 - May 22, 2016
-    Version 2 - April 5, 2017
-    Version 3 - August 16, 2017
-    Version 4 - March 11, 2018 - increased tolerance and added chamfer
-*/
-
-FeatureScript 531;
-import(path : "onshape/std/geometry.fs", version : "531.0");
-
-annotation { "Feature Type Name" : "Spur Gear", "Feature Name Template" : "Spur Gear (#teeth teeth)", "Editing Logic Function" : "editGearLogic" }
+annotation { "Feature Type Name" : "Spur Gear", "Feature Name Template" : "Spur Gear (#teeth teeth)", "Editing Logic Function" : "editGearLogic", "Icon" : icon::BLOB_DATA }
 export const SpurGear = defineFeature(function(context is Context, id is Id, definition is map)
     precondition
     {
