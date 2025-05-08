@@ -1,5 +1,6 @@
-FeatureScript 1096;
-import(path : "onshape/std/common.fs", version : "1096.0");
+FeatureScript 1301;
+import(path : "onshape/std/common.fs", version : "1301.0");
+import(path : "onshape/std/table.fs", version : "1301.0");
 icon::import(path : "84e649fcf78ef2cf627fcf5e", version : "4adb2fbb86b2ebf683c17b68");
 
 annotation { "Feature Type Name" : "Spur Gear", "Feature Name Template" : "Spur Gear (#teeth teeth)", "Editing Logic Function" : "editGearLogic", "Icon" : icon::BLOB_DATA }
@@ -232,10 +233,14 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         const center = worldToPlane(sketchPlane, location);
 
         // create the outer diameter circle
-        skCircle(gearSketch, "addendum", { "center" : center, "radius" : definition.pitchCircleDiameter / 2 + addendum });
+        const outerRadius = definition.pitchCircleDiameter / 2 + addendum;
+        const innerRadius = definition.pitchCircleDiameter / 2 - dedendum;
+        skCircle(gearSketch, "addendum", { "center" : center, "radius" : outerRadius });
+
 
         if (definition.centerHole)
         {
+
             if (definition.key)
             {
                 var keyVector = vector(0, 1);
@@ -318,8 +323,8 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
 
         const regionPoint = center + vector((definition.pitchCircleDiameter / 2 - dedendum + 0.1 * millimeter) * cos(offsetAngle), (definition.pitchCircleDiameter / 2 - dedendum + 0.1 * millimeter) * sin(offsetAngle));
 
-        skCircle(toothSketch, "addendum", { "center" : center, "radius" : definition.pitchCircleDiameter / 2 + addendum });
-        skCircle(toothSketch, "dedendum", { "center" : center, "radius" : definition.pitchCircleDiameter / 2 - dedendum });
+        skCircle(toothSketch, "addendum", { "center" : center, "radius" : outerRadius });
+        skCircle(toothSketch, "dedendum", { "center" : center, "radius" : innerRadius });
         skCircle(toothSketch, "fillet", { "center" : regionPoint, "radius" : 0.1 * millimeter, "construction" : true });
 
         skConstraint(toothSketch, "fix1", { "constraintType" : ConstraintType.FIX, "localFirst" : "dedendum" });
@@ -430,6 +435,10 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                     "construction" : true });
 
         skSolve(PCDSketch);
+
+        var attribute = makeGearAttribute(definition, outerRadius * 2, innerRadius * 2);
+
+        setAttribute(context, { "entities" : qBodyType(qCreatedBy(id, EntityType.BODY), BodyType.SOLID), "attribute" : attribute });
 
         setFeatureComputedParameter(context, id, { "name" : "teeth", "value" : definition.numTeeth });
     });
@@ -591,3 +600,72 @@ export enum HelixDirection
     annotation { "Name" : "Counterclockwise" }
     CCW
 }
+
+export type GearAttribute typecheck canBeGearAttribute;
+
+export predicate canBeGearAttribute(value)
+{
+    value is map;
+}
+
+function makeGearAttribute(definition is map, outerDiameter is ValueWithUnits, innerDiameter is ValueWithUnits) returns GearAttribute
+{
+    return {
+        "outerDiameter" : outerDiameter,
+        "innerDiameter" : innerDiameter,
+        "pitchCircleDiameter" : definition.pitchCircleDiameter,
+        "numTeeth" : definition.numTeeth,
+        "pressureAngle" : definition.pressureAngle,
+    } as GearAttribute; // TODO: center hole, chamfer, helical
+}
+
+annotation { "Table Type Name" : "Gears", "Icon" : icon::BLOB_DATA }
+export const spurGearsTable = defineTable(function(context is Context, definition is map) returns Table
+    precondition
+    {
+        // Define the parameters of the table type
+    }
+    {
+        var columnDefinitions = [
+            tableColumnDefinition("quantity", "Qty."),
+            tableColumnDefinition("numTeeth", "Teeth"),
+            tableColumnDefinition("pitchCircleDiameter", "Pitch diameter"),
+            tableColumnDefinition("outerDiameter", "OD"),
+            tableColumnDefinition("innerDiameter", "Inner teeth diameter"),
+            tableColumnDefinition("pressureAngle", "Pressure angle"),
+        ];
+
+        // Group by same values
+        var uniqueGears = {};
+        var partsWithGearAttributes = qAttributeQuery({} as GearAttribute);
+        for (var part in evaluateQuery(context, partsWithGearAttributes))
+        {
+            const gearAttributes = getAttributes(context, {
+                    "entities" : part,
+                    "attributePattern" : {} as GearAttribute
+            });
+            if (gearAttributes == [])
+            {
+                continue;
+            }
+            const attribute = gearAttributes[0];
+            // TODO: use tolerant comparision, only considering relevant inputs
+            if (uniqueGears[attribute] == undefined)
+            {
+                uniqueGears[attribute] = [ part ];
+                continue;
+            }
+            uniqueGears[attribute] = append(uniqueGears[attribute], part);
+        }
+
+        var rows = [];
+        for (var gearEntry in uniqueGears)
+        {
+            const parts = gearEntry.value;
+            var gearData = gearEntry.key;
+            gearData.quantity = size(gearEntry.value);
+            rows = append(rows, tableRow(gearData, qUnion(parts)));
+        }
+
+        return table("Gears", columnDefinitions, rows);
+    });
