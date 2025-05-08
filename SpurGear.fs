@@ -6,6 +6,8 @@
 
     Version 1 - May 22, 2016
     Version 2 - April 5, 2017
+    Version 3 - August 16, 2017
+    Version 4 - March 11, 2018 - increased tolerance and added chamfer
 */
 
 FeatureScript 531;
@@ -47,6 +49,47 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
 
         annotation { "Name" : "Root fillet type", "Default" : RootFilletType.third }
         definition.rootFillet is RootFilletType;
+
+        annotation { "Name" : "Chamfer", "Default" : false }
+        definition.chamfer is boolean;
+
+        if (definition.chamfer)
+        {
+            annotation { "Name" : "Chamfer type", "Default" : GearChamferType.OFFSET_ANGLE }
+            definition.chamferType is GearChamferType;
+
+            //first quantity input (length)
+            if (definition.chamferType != GearChamferType.TWO_OFFSETS)
+            {
+                annotation { "Name" : "Distance" }
+                isLength(definition.width, CHAMFER_BOUNDS);
+            }
+            else
+            {
+                annotation { "Name" : "Distance 1" }
+                isLength(definition.width1, CHAMFER_BOUNDS);
+            }
+
+            //opposite direction button
+            if (definition.chamferType == GearChamferType.OFFSET_ANGLE ||
+                definition.chamferType == GearChamferType.TWO_OFFSETS)
+            {
+                annotation { "Name" : "Opposite direction", "Default" : false, "UIHint" : "OPPOSITE_DIRECTION" }
+                definition.oppositeDirection is boolean;
+            }
+
+            //second quantity input (length or angle depending on type)
+            if (definition.chamferType == GearChamferType.TWO_OFFSETS)
+            {
+                annotation { "Name" : "Distance 2" }
+                isLength(definition.width2, CHAMFER_BOUNDS);
+            }
+            else if (definition.chamferType == GearChamferType.OFFSET_ANGLE)
+            {
+                annotation { "Name" : "Angle" }
+                isAngle(definition.angle, CHAMFER_ANGLE_BOUNDS);
+            }
+        }
 
         annotation { "Name" : "Center bore" }
         definition.centerHole is boolean;
@@ -194,13 +237,19 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                     "endDepth" : definition.gearDepth
                 });
 
+        if (definition.chamfer)
+        {
+            definition.entities = qLargest(qCreatedBy(id + "extrude1", EntityType.EDGE));
+            opChamfer(context, id + "chamfer1", definition);
+        }
+
         const toothSketch = newSketchOnPlane(context, id + "toothSketch", { "sketchPlane" : sketchPlane });
 
         // build involute splines for each tooth
         var involute1 = [];
         var involute2 = [];
 
-        for (var t = 0; t <= 2; t += (1 / 20)) // (1/20) is the involute spline tolerance
+        for (var t = 0; t <= 2; t += (1 / 50)) // (1/20) is the involute spline tolerance
         {
             // involute definition math
             var angle = t * radian;
@@ -397,6 +446,19 @@ const KEY_BOUNDS =
             (inch) : 0.125
         } as LengthBoundSpec;
 
+const CHAMFER_ANGLE_BOUNDS =
+{
+            (degree) : [0.1, 60, 179.9]
+        } as AngleBoundSpec;
+
+const CHAMFER_BOUNDS =
+{
+            (meter) : [1e-5, 0.0005, 500],
+            (centimeter) : 0.05,
+            (millimeter) : 0.5,
+            (inch) : 0.02
+        } as LengthBoundSpec;
+
 export enum GearInputType
 {
     annotation { "Name" : "Module" }
@@ -427,4 +489,16 @@ export enum DedendumFactor
     d200,
     annotation { "Name" : "1.25 x addendum" }
     d250
+}
+
+export enum GearChamferType
+{
+    annotation { "Name" : "Equal distance" }
+    EQUAL_OFFSETS,
+    annotation { "Name" : "Two distances" }
+    TWO_OFFSETS,
+    annotation { "Name" : "Distance and angle" }
+    OFFSET_ANGLE,
+    annotation { "Hidden" : true }
+    RAW_OFFSET
 }
