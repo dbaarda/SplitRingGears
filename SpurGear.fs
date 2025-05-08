@@ -36,48 +36,51 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         annotation { "Name" : "Pressure angle" }
         isAngle(definition.pressureAngle, PRESSURE_ANGLE_BOUNDS);
 
-        annotation { "Name" : "Root fillet type", "Default" : RootFilletType.third }
+        annotation { "Name" : "Root fillet", "Default" : RootFilletType.third, "UIHint" : "SHOW_LABEL" }
         definition.rootFillet is RootFilletType;
 
         annotation { "Name" : "Chamfer", "Default" : false }
         definition.chamfer is boolean;
 
-        // Copied from the Chamfer feature
         if (definition.chamfer)
         {
-            annotation { "Name" : "Chamfer type", "Default" : GearChamferType.OFFSET_ANGLE }
-            definition.chamferType is GearChamferType;
+            annotation { "Group Name" : "Chamfer", "Collapsed By Default" : false, "Driving Parameter" : "chamfer" }
+            {
+                // Copied from the Chamfer feature
+                annotation { "Name" : "Chamfer type", "Default" : GearChamferType.OFFSET_ANGLE }
+                definition.chamferType is GearChamferType;
 
-            //first quantity input (length)
-            if (definition.chamferType != GearChamferType.TWO_OFFSETS)
-            {
-                annotation { "Name" : "Distance" }
-                isLength(definition.width, CHAMFER_BOUNDS);
-            }
-            else
-            {
-                annotation { "Name" : "Distance 1" }
-                isLength(definition.width1, CHAMFER_BOUNDS);
-            }
+                //first quantity input (length)
+                if (definition.chamferType != GearChamferType.TWO_OFFSETS)
+                {
+                    annotation { "Name" : "Distance" }
+                    isLength(definition.width, CHAMFER_BOUNDS);
+                }
+                else
+                {
+                    annotation { "Name" : "Distance 1" }
+                    isLength(definition.width1, CHAMFER_BOUNDS);
+                }
 
-            //opposite direction button
-            if (definition.chamferType == GearChamferType.OFFSET_ANGLE ||
-                definition.chamferType == GearChamferType.TWO_OFFSETS)
-            {
-                annotation { "Name" : "Opposite direction", "Default" : false, "UIHint" : "OPPOSITE_DIRECTION" }
-                definition.oppositeDirection is boolean;
-            }
+                //opposite direction button
+                if (definition.chamferType == GearChamferType.OFFSET_ANGLE ||
+                    definition.chamferType == GearChamferType.TWO_OFFSETS)
+                {
+                    annotation { "Name" : "Opposite direction", "Default" : false, "UIHint" : "OPPOSITE_DIRECTION" }
+                    definition.oppositeDirection is boolean;
+                }
 
-            //second quantity input (length or angle depending on type)
-            if (definition.chamferType == GearChamferType.TWO_OFFSETS)
-            {
-                annotation { "Name" : "Distance 2" }
-                isLength(definition.width2, CHAMFER_BOUNDS);
-            }
-            else if (definition.chamferType == GearChamferType.OFFSET_ANGLE)
-            {
-                annotation { "Name" : "Angle" }
-                isAngle(definition.angle, CHAMFER_ANGLE_BOUNDS);
+                //second quantity input (length or angle depending on type)
+                if (definition.chamferType == GearChamferType.TWO_OFFSETS)
+                {
+                    annotation { "Name" : "Distance 2" }
+                    isLength(definition.width2, CHAMFER_BOUNDS);
+                }
+                else if (definition.chamferType == GearChamferType.OFFSET_ANGLE)
+                {
+                    annotation { "Name" : "Angle" }
+                    isAngle(definition.angle, CHAMFER_ANGLE_BOUNDS);
+                }
             }
         }
 
@@ -86,54 +89,84 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
 
         if (definition.centerHole)
         {
-            annotation { "Name" : "Bore diameter" }
-            isLength(definition.centerHoleDia, CENTERHOLE_BOUNDS);
-
-            annotation { "Name" : "Keyway" }
-            definition.key is boolean;
-
-            if (definition.key)
+            annotation { "Group Name" : "Center Bore", "Collapsed By Default" : false, "Driving Parameter" : "centerHole" }
             {
-                annotation { "Name" : "Key width" }
-                isLength(definition.keyWidth, KEY_BOUNDS);
+                annotation { "Name" : "Bore diameter" }
+                isLength(definition.centerHoleDia, CENTERHOLE_BOUNDS);
 
-                annotation { "Name" : "Key height" }
-                isLength(definition.keyHeight, KEY_BOUNDS);
+                annotation { "Name" : "Keyway" }
+                definition.key is boolean;
+
+                if (definition.key)
+                {
+                    annotation { "Name" : "Key width" }
+                    isLength(definition.keyWidth, KEY_BOUNDS);
+
+                    annotation { "Name" : "Key height" }
+                    isLength(definition.keyHeight, KEY_BOUNDS);
+                }
             }
         }
 
-        annotation { "Name" : "Select origin position" }
-        definition.centerPoint is boolean;
-
-        if (definition.centerPoint)
-        {
-            annotation { "Name" : "Sketch vertex for center", "Filter" : EntityType.VERTEX && SketchObject.YES, "MaxNumberOfPicks" : 1 }
-            definition.center is Query;
-        }
-
-        annotation { "Name" : "Extrude depth" }
-        isLength(definition.gearDepth, BLEND_BOUNDS);
-
-        annotation { "Name" : "Extrude direction", "UIHint" : "OPPOSITE_DIRECTION" }
-        definition.flipGear is boolean;
-
-        annotation { "Name" : "Offset" }
+        annotation { "Name" : "Profile offsets" }
         definition.offset is boolean;
 
         if (definition.offset)
         {
-            annotation { "Name" : "Root diameter" }
-            isLength(definition.offsetClearance, ZERO_DEFAULT_LENGTH_BOUNDS);
+            annotation { "Group Name" : "Offsets", "Collapsed By Default" : false, "Driving Parameter" : "offset" }
+            {
+                annotation { "Name" : "Backlash" }
+                isLength(definition.backlash, BACKLASH_BOUNDS);
 
-            annotation { "Name" : "Dedendum factor", "Default" : DedendumFactor.d250 }
-            definition.dedendumFactor is DedendumFactor;
+                annotation { "Name" : "Dedendum", "Default" : DedendumFactor.d250, "UIHint" : "SHOW_LABEL" }
+                definition.dedendumFactor is DedendumFactor;
 
-            annotation { "Name" : "Outside diameter" }
-            isLength(definition.offsetDiameter, ZERO_DEFAULT_LENGTH_BOUNDS);
+                annotation { "Name" : "Root diameter" }
+                isLength(definition.offsetClearance, ZERO_DEFAULT_LENGTH_BOUNDS);
 
-            annotation { "Name" : "Tooth angle" }
-            isAngle(definition.offsetAngle, ANGLE_360_ZERO_DEFAULT_BOUNDS);
+                annotation { "Name" : "Tip diameter" }
+                isLength(definition.offsetDiameter, ZERO_DEFAULT_LENGTH_BOUNDS);
+
+                annotation { "Name" : "Clocking angle" }
+                isAngle(definition.offsetAngle, ANGLE_360_ZERO_DEFAULT_BOUNDS);
+            }
         }
+
+        annotation { "Name" : "Helical" }
+        definition.helical is boolean;
+
+        if (definition.helical)
+        {
+            annotation { "Group Name" : "Helical", "Collapsed By Default" : false, "Driving Parameter" : "helical" }
+            {
+                annotation { "Name" : "Angle" }
+                isAngle(definition.helixAngle, HELIX_ANGLE_BOUNDS);
+
+                annotation { "Name" : "Handedness" }
+                definition.handedness is HelixDirection;
+
+                annotation { "Name" : "Double helix" }
+                definition.double is boolean;
+            }
+        }
+
+        annotation { "Name" : "Move origin" }
+        definition.centerPoint is boolean;
+
+        if (definition.centerPoint)
+        {
+            annotation { "Group Name" : "Center point", "Collapsed By Default" : false, "Driving Parameter" : "centerPoint" }
+            {
+                annotation { "Name" : "Sketch vertex or mate connector", "Filter" : (EntityType.VERTEX && SketchObject.YES) || BodyType.MATE_CONNECTOR, "MaxNumberOfPicks" : 1 }
+                definition.center is Query;
+            }
+        }
+
+        annotation { "Name" : "Depth" }
+        isLength(definition.gearDepth, BLEND_BOUNDS);
+
+        annotation { "Name" : "Depth direction", "UIHint" : "OPPOSITE_DIRECTION" }
+        definition.flipGear is boolean;
     }
 
     {
@@ -141,12 +174,21 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         var offsetDiameter = 0 * meter;
         var offsetClearance = 0 * meter;
         var offsetAngle = 0 * degree;
+        var backlash = 0 * meter;
+        var dedendumFactor = 1.25;
 
         if (definition.offset)
         {
             offsetDiameter = definition.offsetDiameter;
             offsetClearance = definition.offsetClearance;
             offsetAngle = definition.offsetAngle;
+            backlash = definition.backlash;
+
+            if (definition.dedendumFactor == DedendumFactor.d157)
+                dedendumFactor = 1.157;
+
+            if (definition.dedendumFactor == DedendumFactor.d200)
+                dedendumFactor = 1.2;
         }
 
         if (definition.centerHole && definition.centerHoleDia >= definition.pitchCircleDiameter - 4 * definition.module)
@@ -158,14 +200,6 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         {
             throw regenError("Center hole diameter plus Key height must be less than the root diameter", ["keyHeight"]);
         }
-
-        var dedendumFactor = 1.25;
-
-        if (definition.dedendumFactor == DedendumFactor.d157)
-            dedendumFactor = 1.157;
-
-        if (definition.dedendumFactor == DedendumFactor.d200)
-            dedendumFactor = 1.2;
 
         const addendum = definition.module + offsetDiameter;
         const dedendum = dedendumFactor * definition.module + offsetClearance;
@@ -179,11 +213,19 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         var location = vector(0, 0, 0) * meter;
         var sketchPlane = plane(location, vector(0, -1, 0), vector(1, 0, 0));
 
-        // else find location of selected vertex and its sketch plane and create a new sketch for the gear profile
+        // else find location of selected vertex and its sketch plane or use mate connector to create a new sketch for the gear profile
         if (definition.centerPoint)
         {
-            location = evVertexPoint(context, { "vertex" : definition.center });
-            sketchPlane = evOwnerSketchPlane(context, { "entity" : definition.center });
+            try silent
+            {
+                sketchPlane = evPlane(context, { "face" : definition.center });
+                location = sketchPlane.origin;
+            }
+            catch
+            {
+                sketchPlane = evOwnerSketchPlane(context, { "entity" : definition.center });
+                location = evVertexPoint(context, { "vertex" : definition.center });
+            }
         }
 
         const gearSketch = newSketchOnPlane(context, id + "gearSketch", { "sketchPlane" : sketchPlane });
@@ -237,10 +279,10 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         var involute1 = [];
         var involute2 = [];
 
-        for (var t = 0; t <= 2; t += (1 / 50)) // (1/20) is the involute spline tolerance
+        for (var t = 0; t <= 2; t += (1 / 50)) // (1/50) is the involute spline tolerance
         {
             // involute definition math
-            var angle = t * radian;
+            var angle = (t + (backlash / cos(definition.pressureAngle)) / definition.pitchCircleDiameter / 2) * radian;
             var offset = beta + offsetAngle;
             var ca = cos(angle + offset);
             var sa = sin(angle + offset);
@@ -274,7 +316,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         skFitSpline(toothSketch, "spline1", { "points" : involute1 });
         skFitSpline(toothSketch, "spline2", { "points" : involute2 });
 
-        const regionPoint = center + vector((definition.pitchCircleDiameter / 2) * cos(offsetAngle), (definition.pitchCircleDiameter / 2) * sin(offsetAngle));
+        const regionPoint = center + vector((definition.pitchCircleDiameter / 2 - dedendum + 0.1 * millimeter) * cos(offsetAngle), (definition.pitchCircleDiameter / 2 - dedendum + 0.1 * millimeter) * sin(offsetAngle));
 
         skCircle(toothSketch, "addendum", { "center" : center, "radius" : definition.pitchCircleDiameter / 2 + addendum });
         skCircle(toothSketch, "dedendum", { "center" : center, "radius" : definition.pitchCircleDiameter / 2 - dedendum });
@@ -295,7 +337,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                     "endBound" : BoundingType.BLIND,
                     "endDepth" : definition.gearDepth });
 
-        const filletEdges = qClosestTo(qGeometry(qCreatedBy(id + "tooth", EntityType.EDGE), GeometryType.LINE), location);
+        const filletEdges = qClosestTo(qNonCapEntity(id + "tooth", EntityType.EDGE), location);
 
         var rootFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "fillet") }).radius;
 
@@ -313,7 +355,48 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
             opFillet(context, id + "fillet", { "entities" : filletEdges, "radius" : rootFilletRadius });
         }
 
-        var tools = qCreatedBy(id + "tooth", EntityType.BODY);
+        if (definition.helical)
+        {
+            var profileFace = qCapEntity(id + "tooth", CapType.START, EntityType.FACE);
+            var helicalPitch = (PI * definition.pitchCircleDiameter) / tan(definition.helixAngle);
+            var clockwise = definition.handedness == HelixDirection.CW;
+
+            if (definition.double)
+                clockwise = !clockwise;
+
+            if (definition.flipGear && definition.double)
+                clockwise = !clockwise;
+
+            opHelix(context, id + "helix", {
+                        "direction" : sketchPlane.normal * (definition.flipGear ? -1 : 1),
+                        "axisStart" : location,
+                        "startPoint" : location + sketchPlane.x * definition.pitchCircleDiameter / 2,
+                        "interval" : [0, definition.gearDepth / helicalPitch / (definition.double ? 2 : 1)],
+                        "clockwise" : clockwise,
+                        "helicalPitch" : helicalPitch,
+                        "spiralPitch" : 0 * meter });
+
+            opSweep(context, id + "toothHelix", {
+                        "profiles" : profileFace,
+                        "path" : qCreatedBy(id + "helix", EntityType.EDGE) });
+
+            opDeleteBodies(context, id + "deleteTooth", {
+                        "entities" : qUnion([qCreatedBy(id + "tooth"), qCreatedBy(id + "helix")]) });
+
+            if (definition.double)
+            {
+                opPattern(context, id + "mirror", {
+                            "entities" : qCreatedBy(id + "toothHelix", EntityType.BODY),
+                            "transforms" : [mirrorAcross(evPlane(context, { "face" : qCapEntity(id + "toothHelix", CapType.END, EntityType.FACE) }))],
+                            "instanceNames" : ["1"] });
+
+                opBoolean(context, id + "double", {
+                            "tools" : qUnion([qCreatedBy(id + "toothHelix", EntityType.BODY), qCreatedBy(id + "mirror", EntityType.BODY)]),
+                            "operationType" : BooleanOperationType.UNION });
+            }
+        }
+
+        var tools = qUnion([qCreatedBy(id + "tooth", EntityType.BODY), qCreatedBy(id + "toothHelix", EntityType.BODY)]);
         var transforms = [];
         var instanceNames = [];
 
@@ -335,7 +418,8 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                     "operationType" : BooleanOperationType.SUBTRACTION });
 
         // Remove sketch entities - no longer required
-        opDeleteBodies(context, id + "delete", { "entities" : qUnion([qCreatedBy(id + "gearSketch"), qCreatedBy(id + "toothSketch")]) });
+        opDeleteBodies(context, id + "delete", {
+                    "entities" : qUnion([qCreatedBy(id + "gearSketch"), qCreatedBy(id + "toothSketch")]) });
 
         // created PCD sketch
         const PCDSketch = newSketchOnPlane(context, id + "PCDsketch", { "sketchPlane" : sketchPlane });
@@ -443,6 +527,19 @@ const CHAMFER_BOUNDS =
             (inch) : 0.02
         } as LengthBoundSpec;
 
+const BACKLASH_BOUNDS =
+{
+            (meter) : [-500, 0.0, 500],
+            (centimeter) : 0,
+            (millimeter) : 0,
+            (inch) : 0
+        } as LengthBoundSpec;
+
+const HELIX_ANGLE_BOUNDS =
+{
+            (degree) : [5, 15, 45]
+        } as AngleBoundSpec;
+
 export enum GearInputType
 {
     annotation { "Name" : "Module" }
@@ -455,13 +552,13 @@ export enum GearInputType
 
 export enum RootFilletType
 {
-    annotation { "Name" : "No root fillet" }
+    annotation { "Name" : "None" }
     none,
-    annotation { "Name" : "1/4 root fillet" }
+    annotation { "Name" : "1/4" }
     quarter,
-    annotation { "Name" : "1/3 root fillet" }
+    annotation { "Name" : "1/3" }
     third,
-    annotation { "Name" : "Full root fillet" }
+    annotation { "Name" : "Full" }
     full
 }
 
@@ -485,4 +582,12 @@ export enum GearChamferType
     OFFSET_ANGLE,
     annotation { "Hidden" : true }
     RAW_OFFSET
+}
+
+export enum HelixDirection
+{
+    annotation { "Name" : "Clockwise" }
+    CW,
+    annotation { "Name" : "Counterclockwise" }
+    CCW
 }
