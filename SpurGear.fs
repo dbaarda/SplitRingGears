@@ -1,6 +1,7 @@
-FeatureScript 1576;
-import(path : "onshape/std/common.fs", version : "1576.0");
-import(path : "onshape/std/table.fs", version : "1576.0");
+FeatureScript 2641;
+import(path : "onshape/std/common.fs", version : "2641.0");
+import(path : "onshape/std/transformUV.fs", version : "2641.0");
+import(path : "onshape/std/table.fs", version : "2641.0");
 icon::import(path : "2c1e19686bb476b3d3a8b5ff", version : "83c1a2ddb4f05a896b4c8fe3");
 image::import(path : "dbd6a7dc0e6e6e1bd68e7598", version : "6dcf4534d27ad364d37aca3f");
 
@@ -27,14 +28,40 @@ export enum RootFilletType
     FULL
 }
 
+export enum TipFilletType
+{
+    annotation { "Name" : "None" }
+    NONE,
+    annotation { "Name" : "1/4" }
+    QUARTER,
+    annotation { "Name" : "1/3" }
+    THIRD,
+    annotation { "Name" : "Full" }
+    FULL
+}
+
 export enum DedendumFactor
 {
-    annotation { "Name" : "1.157 x addendum" }
+    annotation { "Name" : "1.00 x Module" }
+    D000,
+    annotation { "Name" : "1.157 x Module" }
     D157,
-    annotation { "Name" : "1.20 x addendum" }
+    annotation { "Name" : "1.20 x Module" }
     D200,
-    annotation { "Name" : "1.25 x addendum" }
+    annotation { "Name" : "1.25 x Module" }
     D250
+}
+
+export enum AddendumFactor
+{
+    annotation { "Name" : "1.00 x Module" }
+    A000,
+    annotation { "Name" : "1.157 x Module" }
+    A157,
+    annotation { "Name" : "1.20 x Module" }
+    A200,
+    annotation { "Name" : "1.25 x Module" }
+    A250,
 }
 
 export enum GearChamferType
@@ -173,6 +200,9 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         annotation { "Name" : "Root fillet", "Default" : RootFilletType.THIRD, "UIHint" : "SHOW_LABEL" }
         definition.rootFillet is RootFilletType;
 
+        annotation { "Name" : "Tip fillet", "Default" : TipFilletType.NONE, "UIHint" : "SHOW_LABEL" }
+        definition.tipFillet is TipFilletType;
+
         annotation { "Group Name" : "Profile offsets", "Collapsed By Default" : true }
         {
             annotation { "Name" : "Backlash",
@@ -181,6 +211,9 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
 
             annotation { "Name" : "Dedendum", "Default" : DedendumFactor.D250, "UIHint" : "SHOW_LABEL" }
             definition.dedendumFactor is DedendumFactor;
+
+            annotation { "Name" : "Addendum", "Default" : AddendumFactor.A000, "UIHint" : "SHOW_LABEL" }
+            definition.addendumFactor is AddendumFactor;
 
             annotation { "Name" : "Root radius",
                         "Description" : "A positive value adds more clearance at the root" }
@@ -313,15 +346,24 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
             }
         }
 
-        var dedendumFactor = 1.25;
+        var addendumFactor = 1.00;
+        if (definition.addendumFactor == AddendumFactor.A157)
+            addendumFactor = 1.157;
+        if (definition.addendumFactor == AddendumFactor.A200)
+            addendumFactor = 1.2;
+        else if (definition.addendumFactor == AddendumFactor.A250)
+            addendumFactor = 1.25;
 
-        if (definition.dedendumFactor == DedendumFactor.D157)
+        var dedendumFactor = 1.25;
+        if (definition.dedendumFactor == DedendumFactor.D000)
+            dedendumFactor = 1.0;
+        else if (definition.dedendumFactor == DedendumFactor.D157)
             dedendumFactor = 1.157;
         else if (definition.dedendumFactor == DedendumFactor.D200)
             dedendumFactor = 1.2;
 
         var gearData = { "center" : vector(0, 0) * meter };
-        gearData.addendum = definition.module + definition.offsetDiameter;
+        gearData.addendum = addendumFactor * definition.module + definition.offsetDiameter;
         gearData.dedendum = dedendumFactor * definition.module + definition.offsetClearance;
         gearData.outerRadius = definition.pitchCircleDiameter / 2 + gearData.addendum;
         gearData.innerRadius = definition.pitchCircleDiameter / 2 - gearData.dedendum;
@@ -348,7 +390,8 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         opBoolean(context, id + "hobbed", {
                     "tools" : qUnion(tooth, qCreatedBy(id + "pattern", EntityType.BODY)),
                     "targets" : blank,
-                    "operationType" : BooleanOperationType.SUBTRACTION
+                    "operationType" : BooleanOperationType.SUBTRACTION,
+                    "keepTools" : false
                 });
 
         opDeleteBodies(context, id + "delete", {
@@ -396,6 +439,7 @@ function setGearData(context is Context, id is Id, definition is map, gearData i
                     "gearInputSize" : gearInputSize,
                     "pitchCircleDiameter" : definition.pitchCircleDiameter,
                     "outsideDiameter" : gearData.outerRadius * 2,
+                    "insideDiameter" : gearData.innerRadius * 2,
                     "pressureAngle" : definition.pressureAngle,
                 } // TODO: center hole, chamfer, helical
             });
@@ -470,92 +514,141 @@ function createBlank(context is Context, id is Id, definition is map, gearData i
 
 function createTooth(context is Context, id is Id, definition is map, gearData is map, sketchPlane is Plane) returns Query
 {
-    const base = definition.pitchCircleDiameter * cos(definition.pressureAngle);
+    const pitchCircleRadius = definition.pitchCircleDiameter / 2;
+    const baseRadius = pitchCircleRadius * cos(definition.pressureAngle);
+    const toothAngle = 2 * PI / definition.numTeeth * radian;
 
-    // angle between root of teeth
-    const alpha = sqrt(definition.pitchCircleDiameter ^ 2 - base ^ 2) / base * radian - definition.pressureAngle;
-    const beta = 360 / (4 * definition.numTeeth) * degree - alpha;
+    // alpha is the angle where the involute curve crosses the pitch circle.
+    const alpha = tan(definition.pressureAngle) * radian - definition.pressureAngle;
+    // backlash is the extra rotation due to the extra backlash-gap (in mm) at the pitch cicle and pressure angle.
+    const backlash = definition.backlash / (2 * cos(definition.pressureAngle) * definition.pitchCircleDiameter) * radian;
+    // beta is the angle between the mid-tooth gap and the next tooth-edge at the pitch circle.
+    const beta = toothAngle / 4 - alpha + backlash;
+    // these are the raw angles to the next and previous tooth edges including offsetAngle.
+    const offset1 = definition.offsetAngle + beta;
+    const offset2 = definition.offsetAngle - beta;
+    // This is a unit-vector pointing to the mid-tooth gap.
+    const middleVect = vector(cos(definition.offsetAngle), sin(definition.offsetAngle));
+    // This is a rotation transform matrix to move around a whole tooth.
+    const rotateTooth = rotate(toothAngle);
 
     const toothSketch = newSketchOnPlane(context, id + "toothSketch", { "sketchPlane" : sketchPlane });
 
     // build involute splines for each tooth
     var involute1 = [];
     var involute2 = [];
-
+    var involute3 = [];
     for (var t = 0; t <= 2; t += (1 / 50)) // (1/50) is the hard-coded involute spline tolerance
     {
-        // involute definition math
-        const angle = (t + (definition.backlash / cos(definition.pressureAngle)) / definition.pitchCircleDiameter / 2) * radian;
-        const offset = beta + definition.offsetAngle;
-        const ca = cos(angle + offset);
-        const sa = sin(angle + offset);
-        const cab = cos(offset - beta * 2 - angle);
-        const sab = sin(offset - beta * 2 - angle);
+        // involute definition math.
+        const angle = t * radian;
+        const ca1 = cos(offset1 + angle);
+        const sa1 = sin(offset1 + angle);
+        const ca2 = cos(offset2 - angle);
+        const sa2 = sin(offset2 - angle);
         var point1;
         var point2;
+        var point3;
 
-        if (base >= definition.pitchCircleDiameter - 2 * gearData.dedendum && t == 0) // special case when base cylinder diameter is greater than dedendum
+        if (baseRadius >= gearData.innerRadius && t == 0)
         {
-            // calculate involute spline point
-            point1 = vector((definition.pitchCircleDiameter / 2 - gearData.dedendum) * ca, (definition.pitchCircleDiameter / 2 - gearData.dedendum) * sa);
-            point2 = vector((definition.pitchCircleDiameter / 2 - gearData.dedendum) * cab, (definition.pitchCircleDiameter / 2 - gearData.dedendum) * sab);
+            // special case when base cylinder diameter is greater than dedendum
+            point1 = gearData.innerRadius * vector(ca1, sa1);
+            point2 = gearData.innerRadius * vector(ca2, sa2);
         }
         else
         {
-            point1 = vector(base * 0.5 * (ca + t * sa), base * 0.5 * (sa - t * ca));
-            point2 = vector(base * 0.5 * (cab - t * sab), base * 0.5 * (sab + t * cab));
+            // calculate involute spline point
+            point1 = baseRadius * vector((ca1 + t * sa1), (sa1 - t * ca1));
+            point2 = baseRadius * vector((ca2 - t * sa2), (sa2 + t * ca2));
         }
+        point3 = rotateTooth.linear * point2;
 
         // and add to array
         involute1 = append(involute1, point1);
         involute2 = append(involute2, point2);
+        involute3 = append(involute3, point3);
 
         // if involute points go outside the outer diameter of the gear then stop
-        if (sqrt(point1[0] ^ 2 + point1[1] ^ 2) >= (definition.pitchCircleDiameter / 2 + gearData.addendum))
+        if (norm(point1) >= gearData.outerRadius)
             break;
     }
 
     // create involute sketch splines
     skFitSpline(toothSketch, "spline1", { "points" : involute1 });
     skFitSpline(toothSketch, "spline2", { "points" : involute2 });
+    skFitSpline(toothSketch, "spline3", { "points" : involute3, "construction" : true });
 
-    const regionPoint = vector((definition.pitchCircleDiameter / 2 - gearData.dedendum / 2) * cos(definition.offsetAngle), ((definition.pitchCircleDiameter / 2 - gearData.dedendum / 2) * sin(definition.offsetAngle)));
+    // gapPoint is in the middle of the tooth-gap on the pitch circle.
+    const gapPoint = pitchCircleRadius * middleVect;
+    // toothPoint is in the middle of the next tooth on the pitch circle.
+    const toothPoint = rotate(toothAngle / 2).linear * gapPoint;
+    // ringPoint is in the middle of the tooth-gap on the outerRadius.
+    const ringPoint = gearData.outerRadius * middleVect;
 
     skCircle(toothSketch, "addendum", { "center" : gearData.center, "radius" : gearData.outerRadius });
     skCircle(toothSketch, "dedendum", { "center" : gearData.center, "radius" : gearData.innerRadius });
+    skCircle(toothSketch, "outring", { "center" : gearData.center, "radius" : gearData.outerRadius + 2.0 * millimeter });
+
+    // fix addendum, dedendum, and splines so they don't move when solving fillet constraints.
+    skConstraint(toothSketch, "fix1", { "constraintType" : ConstraintType.FIX, "localFirst" : "addendum" });
+    skConstraint(toothSketch, "fix2", { "constraintType" : ConstraintType.FIX, "localFirst" : "dedendum" });
+    skConstraint(toothSketch, "fix3", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline1" });
+    skConstraint(toothSketch, "fix4", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline2" });
+    skConstraint(toothSketch, "fix5", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline3" });
 
     if (definition.rootFillet != RootFilletType.NONE)
     {
-        skCircle(toothSketch, "fillet", { "center" : regionPoint, "radius" : 0.1 * millimeter, "construction" : true });
+        skCircle(toothSketch, "rfillet", { "center" : gapPoint, "radius" : 0.1 * millimeter, "construction" : true });
+        skConstraint(toothSketch, "rtangent1", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "rfillet", "localSecond" : "dedendum" });
+        skConstraint(toothSketch, "rtangent2", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "rfillet", "localSecond" : "spline1" });
+        skConstraint(toothSketch, "rtangent3", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "rfillet", "localSecond" : "spline2" });
+    }
 
-        skConstraint(toothSketch, "fix1", { "constraintType" : ConstraintType.FIX, "localFirst" : "dedendum" });
-        skConstraint(toothSketch, "fix2", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline1" });
-        skConstraint(toothSketch, "fix3", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline2" });
-        skConstraint(toothSketch, "tangent1", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "fillet", "localSecond" : "dedendum" });
-        skConstraint(toothSketch, "tangent2", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "fillet", "localSecond" : "spline1" });
-        skConstraint(toothSketch, "tangent3", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "fillet", "localSecond" : "spline2" });
+    if (definition.tipFillet != TipFilletType.NONE)
+    {
+        skCircle(toothSketch, "tfillet", { "center" : toothPoint, "radius" : 0.1 * millimeter, "construction" : true });
+        skConstraint(toothSketch, "ttangent1", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "tfillet", "localSecond" : "addendum" });
+        skConstraint(toothSketch, "ttangent2", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "tfillet", "localSecond" : "spline1" });
+        skConstraint(toothSketch, "ttangent3", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "tfillet", "localSecond" : "spline3" });
     }
 
     skSolve(toothSketch);
 
     var toothId = id + "tooth";
 
-    opExtrude(context, toothId, extrudeParams(definition, qContainsPoint(qCreatedBy(id + "toothSketch", EntityType.FACE), planeToWorld(sketchPlane, regionPoint)), sketchPlane));
+    // This extrudes a tooth-gap attached to an outer ring for subtracting from a gear blank.
+    opExtrude(context, toothId, extrudeParams(definition, qClosestTo(qSketchRegion(id + "toothSketch"), planeToWorld(sketchPlane, ringPoint)), sketchPlane));
 
     if (definition.rootFillet != RootFilletType.NONE)
     {
-        const filletEdges = qClosestTo(qNonCapEntity(id + "tooth", EntityType.EDGE), sketchPlane.origin);
-
-        var rootFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "fillet") }).radius;
+        const rootFilletEdges = qClosestTo(qNonCapEntity(toothId, EntityType.EDGE), sketchPlane.origin);
+        var rootFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "rfillet") }).radius;
 
         if (definition.rootFillet == RootFilletType.THIRD)
             rootFilletRadius /= 1.5;
         else if (definition.rootFillet == RootFilletType.QUARTER)
             rootFilletRadius /= 2;
 
-        opFillet(context, id + "fillet", {
-                    "entities" : filletEdges,
+        opFillet(context, id + "rfillet", {
+                    "entities" : rootFilletEdges,
                     "radius" : rootFilletRadius
+                });
+    }
+
+    if (definition.tipFillet != TipFilletType.NONE)
+    {
+        const tipFilletEdges = qClosestTo(qNonCapEntity(toothId, EntityType.EDGE), planeToWorld(sketchPlane, ringPoint));
+        var tipFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "tfillet") }).radius;
+
+        if (definition.tipFillet == TipFilletType.THIRD)
+            tipFilletRadius /= 1.5;
+        else if (definition.tipFillet == TipFilletType.QUARTER)
+            tipFilletRadius /= 2;
+
+        opFillet(context, id + "tfillet", {
+                    "entities" : tipFilletEdges,
+                    "radius" : tipFilletRadius
                 });
     }
 
@@ -574,7 +667,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
         opHelix(context, id + "helix", {
                     "direction" : sketchPlane.normal * (definition.flipGear ? -1 : 1),
                     "axisStart" : sketchPlane.origin,
-                    "startPoint" : sketchPlane.origin + sketchPlane.x * definition.pitchCircleDiameter / 2,
+                    "startPoint" : sketchPlane.origin + sketchPlane.x * pitchCircleRadius,
                     "interval" : [0, definition.gearDepth / helicalPitch / (definition.double ? 2 : 1)],
                     "clockwise" : clockwise,
                     "helicalPitch" : helicalPitch,
