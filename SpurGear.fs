@@ -62,7 +62,7 @@ const TEETH_BOUNDS =
 
 const PRESSURE_ANGLE_BOUNDS =
 {
-            (degree) : [12, 20, 35]
+            (degree) : [12, 20, 45]
         } as AngleBoundSpec;
 
 const MODULE_BOUNDS =
