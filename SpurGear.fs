@@ -1,8 +1,8 @@
 FeatureScript 1576;
 import(path : "onshape/std/common.fs", version : "1576.0");
 import(path : "onshape/std/table.fs", version : "1576.0");
-icon::import(path : "84e649fcf78ef2cf627fcf5e", version : "4adb2fbb86b2ebf683c17b68");
-image::import(path : "043497848f0f1de8551a633b", version : "9991013568200c693d71d69f");
+icon::import(path : "2c1e19686bb476b3d3a8b5ff", version : "83c1a2ddb4f05a896b4c8fe3");
+image::import(path : "dbd6a7dc0e6e6e1bd68e7598", version : "6dcf4534d27ad364d37aca3f");
 
 
 export enum GearInputType
