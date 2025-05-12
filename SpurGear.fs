@@ -13,10 +13,13 @@ export enum GearInputType
     annotation { "Name" : "Diametral pitch" }
     DIAMETRAL_PITCH,
     annotation { "Name" : "Circular pitch" }
-    CIRCULAR_PITCH
+    CIRCULAR_PITCH,
+    annotation { "Name" : "Pitch diameter" }
+    PITCH_DIAMETER
 }
 
-export enum RootFilletType
+// This is used for both tooth root and tip fillets.
+export enum GearFilletType
 {
     annotation { "Name" : "None" }
     NONE,
@@ -28,19 +31,8 @@ export enum RootFilletType
     FULL
 }
 
-export enum TipFilletType
-{
-    annotation { "Name" : "None" }
-    NONE,
-    annotation { "Name" : "1/4" }
-    QUARTER,
-    annotation { "Name" : "1/3" }
-    THIRD,
-    annotation { "Name" : "Full" }
-    FULL
-}
-
-export enum DedendumFactor
+//This is used for both addendum and dedendum factors.
+export enum GearDendumFactor
 {
     annotation { "Name" : "1.00 x Module" }
     D000,
@@ -50,18 +42,6 @@ export enum DedendumFactor
     D200,
     annotation { "Name" : "1.25 x Module" }
     D250
-}
-
-export enum AddendumFactor
-{
-    annotation { "Name" : "1.00 x Module" }
-    A000,
-    annotation { "Name" : "1.157 x Module" }
-    A157,
-    annotation { "Name" : "1.20 x Module" }
-    A200,
-    annotation { "Name" : "1.25 x Module" }
-    A250,
 }
 
 export enum GearChamferType
@@ -170,9 +150,10 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         isInteger(definition.numTeeth, TEETH_BOUNDS);
 
         annotation { "Name" : "Gear size and tooth pitch calculation method",
-                    "Description" : "<b>Module</b> - Pitch diameter divided by number of teeth<br>" ~
-                    "<b>Diametral pitch</b> - Number of teeth divided by pitch diameter (in inches)<br>" ~
-                    "<b>Circular pitch</b> - Pitch circumference divided by number of teeth" }
+                    "Description" : "<b>Module</b> - Pitch diameter length per tooth.<br>" ~
+                    "<b>Diametral pitch</b> - Teeth per inch of pitch diameter.<br>" ~
+                    "<b>Circular pitch</b> - Pitch circumference length per tooth.<br>" ~
+                    "<b>Pitch diameter</b> - Fixed pitch circle diameter length." }
         definition.GearInputType is GearInputType;
 
         if (definition.GearInputType == GearInputType.MODULE)
@@ -182,7 +163,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         }
         else if (definition.GearInputType == GearInputType.DIAMETRAL_PITCH)
         {
-            annotation { "Name" : "Diametral pitch / inch" }
+            annotation { "Name" : "Diametral pitch (teeth/inch)" }
             isReal(definition.diametralPitch, POSITIVE_REAL_BOUNDS);
         }
         else if (definition.GearInputType == GearInputType.CIRCULAR_PITCH)
@@ -190,18 +171,20 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
             annotation { "Name" : "Circular pitch" }
             isLength(definition.circularPitch, LENGTH_BOUNDS);
         }
-
-        annotation { "Name" : "Pitch circle diameter" }
-        isLength(definition.pitchCircleDiameter, LENGTH_BOUNDS);
+        else if (definition.GearInputType == GearInputType.PITCH_DIAMETER)
+        {
+            annotation { "Name" : "Pitch diameter" }
+            isLength(definition.pitchCircleDiameter, LENGTH_BOUNDS);
+        }
 
         annotation { "Name" : "Pressure angle" }
         isAngle(definition.pressureAngle, PRESSURE_ANGLE_BOUNDS);
 
-        annotation { "Name" : "Root fillet", "Default" : RootFilletType.THIRD, "UIHint" : "SHOW_LABEL" }
-        definition.rootFillet is RootFilletType;
+        annotation { "Name" : "Root fillet", "Default" : GearFilletType.THIRD, "UIHint" : "SHOW_LABEL" }
+        definition.rootFillet is GearFilletType;
 
-        annotation { "Name" : "Tip fillet", "Default" : TipFilletType.NONE, "UIHint" : "SHOW_LABEL" }
-        definition.tipFillet is TipFilletType;
+        annotation { "Name" : "Tip fillet", "Default" : GearFilletType.NONE, "UIHint" : "SHOW_LABEL" }
+        definition.tipFillet is GearFilletType;
 
         annotation { "Group Name" : "Profile offsets", "Collapsed By Default" : true }
         {
@@ -209,11 +192,11 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                         "Description" : "A positive value adds clearance between all meshing faces" }
             isLength(definition.backlash, BACKLASH_BOUNDS);
 
-            annotation { "Name" : "Dedendum", "Default" : DedendumFactor.D250, "UIHint" : "SHOW_LABEL" }
-            definition.dedendumFactor is DedendumFactor;
+            annotation { "Name" : "Dedendum", "Default" : GearDendumFactor.D250, "UIHint" : "SHOW_LABEL" }
+            definition.dedendumFactor is GearDendumFactor;
 
-            annotation { "Name" : "Addendum", "Default" : AddendumFactor.A000, "UIHint" : "SHOW_LABEL" }
-            definition.addendumFactor is AddendumFactor;
+            annotation { "Name" : "Addendum", "Default" : GearDendumFactor.D000, "UIHint" : "SHOW_LABEL" }
+            definition.addendumFactor is GearDendumFactor;
 
             annotation { "Name" : "Root radius",
                         "Description" : "A positive value adds more clearance at the root" }
@@ -314,6 +297,9 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
     }
 
     {
+        // Note editGearLogic() is not automatically called when variables used in settings change, so we call it explicitly to ensure the settings are consistent.
+        definition = editGearLogic(context, id, definition, definition, false);
+
         if (definition.centerHole && definition.centerHoleDia >= definition.pitchCircleDiameter - 4 * definition.module)
         {
             throw regenError("Center hole diameter must be less than root diameter", ["centerHoleDia"]);
@@ -347,26 +333,27 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         }
 
         var addendumFactor = 1.00;
-        if (definition.addendumFactor == AddendumFactor.A157)
+        if (definition.addendumFactor == GearDendumFactor.D157)
             addendumFactor = 1.157;
-        if (definition.addendumFactor == AddendumFactor.A200)
+        if (definition.addendumFactor == GearDendumFactor.D200)
             addendumFactor = 1.2;
-        else if (definition.addendumFactor == AddendumFactor.A250)
+        else if (definition.addendumFactor == GearDendumFactor.D250)
             addendumFactor = 1.25;
 
         var dedendumFactor = 1.25;
-        if (definition.dedendumFactor == DedendumFactor.D000)
+        if (definition.dedendumFactor == GearDendumFactor.D000)
             dedendumFactor = 1.0;
-        else if (definition.dedendumFactor == DedendumFactor.D157)
+        else if (definition.dedendumFactor == GearDendumFactor.D157)
             dedendumFactor = 1.157;
-        else if (definition.dedendumFactor == DedendumFactor.D200)
+        else if (definition.dedendumFactor == GearDendumFactor.D200)
             dedendumFactor = 1.2;
 
         var gearData = { "center" : vector(0, 0) * meter };
         gearData.addendum = addendumFactor * definition.module + definition.offsetDiameter;
         gearData.dedendum = dedendumFactor * definition.module + definition.offsetClearance;
-        gearData.outerRadius = definition.pitchCircleDiameter / 2 + gearData.addendum;
-        gearData.innerRadius = definition.pitchCircleDiameter / 2 - gearData.dedendum;
+        gearData.pitchRadius = definition.pitchCircleDiameter / 2;
+        gearData.outerRadius = gearData.pitchRadius + gearData.addendum;
+        gearData.innerRadius = gearData.pitchRadius - gearData.dedendum;
 
         const blank = createBlank(context, id, definition, gearData, sketchPlane);
         const tooth = createTooth(context, id, definition, gearData, sketchPlane);
@@ -403,7 +390,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
 
         skCircle(PCDSketch, "PCD", {
                     "center" : gearData.center,
-                    "radius" : definition.pitchCircleDiameter / 2,
+                    "radius" : gearData.pitchRadius,
                     "construction" : true
                 });
 
@@ -429,6 +416,11 @@ function setGearData(context is Context, id is Id, definition is map, gearData i
         gearInputType = "Circular pitch";
         gearInputSize = definition.circularPitch;
     }
+    else if (definition.GearInputType == GearInputType.PITCH_DIAMETER)
+    {
+        gearInputType = "Pitch diameter";
+        gearInputSize = definition.pitchCircleDiameter;
+    }
 
     setAttribute(context, {
                 "entities" : qBodyType(qCreatedBy(id, EntityType.BODY), BodyType.SOLID),
@@ -438,8 +430,8 @@ function setGearData(context is Context, id is Id, definition is map, gearData i
                     "gearInputType" : gearInputType,
                     "gearInputSize" : gearInputSize,
                     "pitchCircleDiameter" : definition.pitchCircleDiameter,
-                    "outsideDiameter" : gearData.outerRadius * 2,
-                    "insideDiameter" : gearData.innerRadius * 2,
+                    "outerDiameter" : gearData.outerRadius * 2,
+                    "innerDiameter" : gearData.innerRadius * 2,
                     "pressureAngle" : definition.pressureAngle,
                 } // TODO: center hole, chamfer, helical
             });
@@ -514,10 +506,8 @@ function createBlank(context is Context, id is Id, definition is map, gearData i
 
 function createTooth(context is Context, id is Id, definition is map, gearData is map, sketchPlane is Plane) returns Query
 {
-    const pitchCircleRadius = definition.pitchCircleDiameter / 2;
-    const baseRadius = pitchCircleRadius * cos(definition.pressureAngle);
+    const baseRadius = gearData.pitchRadius * cos(definition.pressureAngle);
     const toothAngle = 2 * PI / definition.numTeeth * radian;
-
     // alpha is the angle where the involute curve crosses the pitch circle.
     const alpha = tan(definition.pressureAngle) * radian - definition.pressureAngle;
     // backlash is the extra rotation due to the extra backlash-gap (in mm) at the pitch cicle and pressure angle.
@@ -580,7 +570,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
     skFitSpline(toothSketch, "spline3", { "points" : involute3, "construction" : true });
 
     // gapPoint is in the middle of the tooth-gap on the pitch circle.
-    const gapPoint = pitchCircleRadius * middleVect;
+    const gapPoint = gearData.pitchRadius * middleVect;
     // toothPoint is in the middle of the next tooth on the pitch circle.
     const toothPoint = rotate(toothAngle / 2).linear * gapPoint;
     // ringPoint is in the middle of the tooth-gap on the outerRadius.
@@ -588,7 +578,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
 
     skCircle(toothSketch, "addendum", { "center" : gearData.center, "radius" : gearData.outerRadius });
     skCircle(toothSketch, "dedendum", { "center" : gearData.center, "radius" : gearData.innerRadius });
-    skCircle(toothSketch, "outring", { "center" : gearData.center, "radius" : gearData.outerRadius + 2.0 * millimeter });
+    skCircle(toothSketch, "outring", { "center" : gearData.center, "radius" : gearData.outerRadius + 1.0 * millimeter });
 
     // fix addendum, dedendum, and splines so they don't move when solving fillet constraints.
     skConstraint(toothSketch, "fix1", { "constraintType" : ConstraintType.FIX, "localFirst" : "addendum" });
@@ -597,7 +587,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
     skConstraint(toothSketch, "fix4", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline2" });
     skConstraint(toothSketch, "fix5", { "constraintType" : ConstraintType.FIX, "localFirst" : "spline3" });
 
-    if (definition.rootFillet != RootFilletType.NONE)
+    if (definition.rootFillet != GearFilletType.NONE)
     {
         skCircle(toothSketch, "rfillet", { "center" : gapPoint, "radius" : 0.1 * millimeter, "construction" : true });
         skConstraint(toothSketch, "rtangent1", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "rfillet", "localSecond" : "dedendum" });
@@ -605,7 +595,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
         skConstraint(toothSketch, "rtangent3", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "rfillet", "localSecond" : "spline2" });
     }
 
-    if (definition.tipFillet != TipFilletType.NONE)
+    if (definition.tipFillet != GearFilletType.NONE)
     {
         skCircle(toothSketch, "tfillet", { "center" : toothPoint, "radius" : 0.1 * millimeter, "construction" : true });
         skConstraint(toothSketch, "ttangent1", { "constraintType" : ConstraintType.TANGENT, "localFirst" : "tfillet", "localSecond" : "addendum" });
@@ -620,14 +610,14 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
     // This extrudes a tooth-gap attached to an outer ring for subtracting from a gear blank.
     opExtrude(context, toothId, extrudeParams(definition, qClosestTo(qSketchRegion(id + "toothSketch"), planeToWorld(sketchPlane, ringPoint)), sketchPlane));
 
-    if (definition.rootFillet != RootFilletType.NONE)
+    if (definition.rootFillet != GearFilletType.NONE)
     {
         const rootFilletEdges = qClosestTo(qNonCapEntity(toothId, EntityType.EDGE), sketchPlane.origin);
         var rootFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "rfillet") }).radius;
 
-        if (definition.rootFillet == RootFilletType.THIRD)
+        if (definition.rootFillet == GearFilletType.THIRD)
             rootFilletRadius /= 1.5;
-        else if (definition.rootFillet == RootFilletType.QUARTER)
+        else if (definition.rootFillet == GearFilletType.QUARTER)
             rootFilletRadius /= 2;
 
         opFillet(context, id + "rfillet", {
@@ -636,14 +626,14 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
                 });
     }
 
-    if (definition.tipFillet != TipFilletType.NONE)
+    if (definition.tipFillet != GearFilletType.NONE)
     {
         const tipFilletEdges = qClosestTo(qNonCapEntity(toothId, EntityType.EDGE), planeToWorld(sketchPlane, ringPoint));
         var tipFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "tfillet") }).radius;
 
-        if (definition.tipFillet == TipFilletType.THIRD)
+        if (definition.tipFillet == GearFilletType.THIRD)
             tipFilletRadius /= 1.5;
-        else if (definition.tipFillet == TipFilletType.QUARTER)
+        else if (definition.tipFillet == GearFilletType.QUARTER)
             tipFilletRadius /= 2;
 
         opFillet(context, id + "tfillet", {
@@ -667,7 +657,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
         opHelix(context, id + "helix", {
                     "direction" : sketchPlane.normal * (definition.flipGear ? -1 : 1),
                     "axisStart" : sketchPlane.origin,
-                    "startPoint" : sketchPlane.origin + sketchPlane.x * pitchCircleRadius,
+                    "startPoint" : sketchPlane.origin + sketchPlane.x * gearData.pitchRadius,
                     "interval" : [0, definition.gearDepth / helicalPitch / (definition.double ? 2 : 1)],
                     "clockwise" : clockwise,
                     "helicalPitch" : helicalPitch,
@@ -724,37 +714,22 @@ function extrudeParams(definition is map, entities is Query, sketchPlane is Plan
 
 export function editGearLogic(context is Context, id is Id, oldDefinition is map, definition is map, isCreating is boolean) returns map
 {
-    if (oldDefinition.numTeeth != definition.numTeeth)
-    {
+    // Note we only assign settings if they need to be changed so we don't overwrite correct settings using variables.
+    // Update module from diametralPitch, circularPitch, or pitchCircleDiameter if they are authoratative.
+    if (definition.GearInputType == GearInputType.DIAMETRAL_PITCH && definition.module != inch / definition.diametralPitch)
+        definition.module = inch / definition.diametralPitch;
+    else if (definition.GearInputType == GearInputType.CIRCULAR_PITCH && definition.module != definition.circularPitch / PI)
+        definition.module = definition.circularPitch / PI;
+    else if (definition.GearInputType == GearInputType.PITCH_DIAMETER && definition.module != definition.pitchCircleDiameter / definition.numTeeth)
+        definition.module = definition.pitchCircleDiameter / definition.numTeeth;
+
+    // Correct settings relationships if they are wrong.
+    if (definition.diametralPitch != inch / definition.module)
+        definition.diametralPitch = inch / definition.module;
+    if (definition.circularPitch != definition.module * PI)
+        definition.circularPitch = definition.module * PI;
+    if (definition.pitchCircleDiameter != definition.numTeeth * definition.module)
         definition.pitchCircleDiameter = definition.numTeeth * definition.module;
-    }
-
-    var module;
-
-    if (oldDefinition.module != definition.module)
-    {
-        module = definition.module;
-    }
-    else if (oldDefinition.diametralPitch != definition.diametralPitch)
-    {
-        module = inch / definition.diametralPitch;
-    }
-    else if (oldDefinition.circularPitch != definition.circularPitch)
-    {
-        module = definition.circularPitch / PI;
-    }
-    else if (oldDefinition.pitchCircleDiameter != definition.pitchCircleDiameter)
-    {
-        module = definition.pitchCircleDiameter / definition.numTeeth;
-    }
-
-    if (module != undefined)
-    {
-        definition.module = module;
-        definition.circularPitch = module * PI;
-        definition.pitchCircleDiameter = definition.numTeeth * module;
-        definition.diametralPitch = 1 * inch / module;
-    }
 
     return definition;
 }
@@ -771,7 +746,8 @@ export const spurGearsTable = defineTable(function(context is Context, definitio
                 tableColumnDefinition("gearInputType", "Pitch type"),
                 tableColumnDefinition("gearInputSize", "Pitch size"),
                 tableColumnDefinition("pitchCircleDiameter", "Pitch diameter"),
-                tableColumnDefinition("outsideDiameter", "Outside diameter"),
+                tableColumnDefinition("outerDiameter", "Outer diameter"),
+                tableColumnDefinition("innerDiameter", "Inner diameter"),
                 tableColumnDefinition("pressureAngle", "Pressure angle"),
             ];
 
