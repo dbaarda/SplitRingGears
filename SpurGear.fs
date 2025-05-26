@@ -1,10 +1,14 @@
-FeatureScript 2641;
-import(path : "onshape/std/common.fs", version : "2641.0");
-import(path : "onshape/std/extrude.fs", version : "2641.0");
-import(path : "onshape/std/transformUV.fs", version : "2641.0");
-import(path : "onshape/std/table.fs", version : "2641.0");
+FeatureScript 2180;
+import(path : "onshape/std/common.fs", version : "2180.0");
+import(path : "onshape/std/table.fs", version : "2180.0");
 icon::import(path : "2c1e19686bb476b3d3a8b5ff", version : "83c1a2ddb4f05a896b4c8fe3");
 image::import(path : "dbd6a7dc0e6e6e1bd68e7598", version : "6dcf4534d27ad364d37aca3f");
+
+// Note newer std library versions have strange distortion bugs, see;
+// https://forum.onshape.com/discussion/comment/116766
+// Profiling these two working versions gave;
+// * version 1576 940ms for circular pattern, 2.01s for Gear parts.
+// * version 2180 911ms for circular pattern, 1.96s for Gear parts.
 
 
 export enum GearInputType
@@ -53,14 +57,6 @@ export enum GearChamferType
     TWO_OFFSETS,
     annotation { "Name" : "Distance and angle" }
     OFFSET_ANGLE
-}
-
-export enum HelixDirection
-{
-    annotation { "Name" : "Clockwise" }
-    CW,
-    annotation { "Name" : "Counterclockwise" }
-    CCW
 }
 
 const TEETH_BOUNDS =
@@ -378,7 +374,7 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         opBoolean(context, id + "hobbed", {
                     "tools" : qUnion(tooth, qCreatedBy(id + "pattern", EntityType.BODY)),
                     "targets" : blank,
-                    "operationType" : BooleanOperationType.SUBTRACTION,
+                    "operationType" : BooleanOperationType.SUBTRACTION
                 });
 
         opDeleteBodies(context, id + "delete", { "entities" : qSubtraction(qCreatedBy(id, EntityType.BODY), blank) });
@@ -389,6 +385,11 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         skCircle(PCDSketch, "PCD", {
                     "center" : gearData.center,
                     "radius" : gearData.pitchRadius,
+                    "construction" : true
+                });
+        skLineSegment(PCDSketch, "clockline", {
+                    "start" : vector(0, 0) * millimeter,
+                    "end" : gearData.pitchRadius * vector(cos(definition.offsetAngle), sin(definition.offsetAngle)),
                     "construction" : true
                 });
 
@@ -617,7 +618,6 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
     var toothId = id + "tooth";
 
     // This extrudes a tooth-gap possibly attached to an outer arc for subtracting from a gear blank.
-    //opExtrude(context, toothId, extrudeParams(definition, qClosestTo(qSketchRegion(id + "toothSketch"), planeToWorld(sketchPlane, middleOuterPoint)), sketchPlane));
     opExtrude(context, toothId, extrudeParams(definition, qSketchRegion(id + "toothSketch"), sketchPlane));
 
     if (definition.rootFillet != GearFilletType.NONE)
@@ -650,15 +650,14 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
                     "entities" : tipFilletEdges,
                     "radius" : tipFilletRadius
                 });
-        // remove enclosing arc because it makes patterning/removing teeth more expensive.
-        extrude(context, id + "delring", {
-                    "entities" : qClosestTo(qSketchRegion(id + "toothSketch"), planeToWorld(sketchPlane, middleRingPoint)),
-                    "endBound" : BoundingType.THROUGH_ALL,
-                    "hasSecondDirection" : true,
-                    "secondDirectionBound" : BoundingType.THROUGH_ALL,
-                    "operationType" : NewBodyOperationType.REMOVE,
-                    "defaultScope" : false,
-                    "booleanScope" : qCreatedBy(toothId, EntityType.BODY) });
+
+        // remove enclosing ring arc because it makes patterning/removing teeth more expensive.
+        opExtrude(context, id + "ringArc", extrudeParams(definition, qClosestTo(qSketchRegion(id + "toothSketch"), planeToWorld(sketchPlane, middleRingPoint)), sketchPlane));
+        opBoolean(context, id + "delring", {
+                    "tools" : qCreatedBy(id + "ringArc", EntityType.BODY),
+                    "targets" : qCreatedBy(toothId, EntityType.BODY),
+                    "operationType" : BooleanOperationType.SUBTRACTION
+                });
     }
 
     if (definition.helical)
