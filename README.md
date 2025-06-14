@@ -48,6 +48,9 @@ If meshing gears have a coprime number of teeth, then every tooth of both
 gears will mesh with every tooth of the other gear. This can reduce wear, and
 is called a "hunting tooth" design.
 
+Addendum coeficient ha = 1.0
+Dedendum coefficient hf = 1.25
+
 
 ## Planetary Gearbox
 
@@ -505,3 +508,264 @@ There are a few options on how these can be arranged;
    bearing arrangement, only with smooth and lubricated surfaces. So the
    simplification of eliminating the carrier and bearings for the gears might
    be at the cost of efficiency.
+
+## Onshape SpurGear.fs
+
+There is a Spur Gear feature in Onshape.
+
+
+## Onshape Split Ring Gear
+
+https://cad.onshape.com/documents/20f9c79862f9e146cf32354f/v/c195d1eac2888f9e323ba598/e/05de466a9d3c7a5d076da907?configuration=Enable_3D_Print_Bridges_%3Dfalse%3BGearDepth%3D0.004%2Bmeter%3BInput_Bolt_Diameter%3D0.002%2Bmeter%3BInput_Bolt_Pattern_Diameter%3D0.01%2Bmeter%3BInput_Bolt_Pattern_Number%3D4.0%3BList_3zy7YgDOqYAwHT%3DDefault%3BList_89ihjy7v5ZcINf%3DDefault%3BNum_Planets%3D3.0%3BOutput_Bolt_Diameter%3D0.002%2Bmeter%3BOutput_Bolt_Pattern_Diameter%3D0.01%2Bmeter%3BOutput_Bolt_Pattern_Number%3D4.0%3BPlanet1_Teeth%3D23.0%3BPlanet2_Teeth%3D21.0%3BRing1_Teeth%3D56.0%3BRing2_Teeth%3D52.0%3BStage1_Module%3D5.0E-4%2Bmeter%3BenableSun2Idler%3Dfalse&renderMode=0&uiState=682d5b06b675fa417cb7e972
+
+## Gearbox 1
+
+
+First printed gearbox used;
+
+Num Planets: 3
+Stage1 Module: 0.5
+Ring1 teeth: 56
+Planet1 teeth: 23
+Ring2 teeth: 52
+Planet2 teeth: 21
+Gear Depth: 4mm
+Enable Sun2 Idler: false
+Ratio: 394.7
+
+This was the first choice for this search;
+
+```bash
+$ ./pgears.py -G=SRP --rpc --rp2c -m=0.5 -m2=0.5.. -s=10 -Dext=30 -R=400
+```
+
+I had -s=10 because that's the gear on the Oribiter's standard stepper-motor,
+and -Dext=30 to make it fit within a 32mm diameter case.
+
+## Gearbox 2
+
+The second printed gearbox used the same settings, but tweaked the design to
+be a bit smaller.
+
+## Geabox 3
+
+I wanted to try for something smaller but with an even higher ratio.
+
+Num Planets: 3
+Stage1 Module: 0.5
+Ring1 teeth: 34
+Planet1 teeth: 13
+Ring2 teeth: 29
+Planet2 teeth: 11
+Gear Depth: 3mm
+Enable Sun2 Idler: true
+Ratio: 659.75
+
+Found as first choice with;
+
+```bash
+./pgears.py -G=SRI -spr=1.0 --rpc --rp2c -m2=0.5.. -tmin=4 -s=8.. -Dext=22 -R=600
+```
+
+I set `-spr=1.0 -tmin=4 -s=8..` to enable tiny sun2 idlers but have sun1 with at
+least 8 teeth while requiring sun1 not be larger than planet1. Note this
+solution has an external ring dedendum of only 18.25mm, so will fit
+in a 21mm case. This means we could increase the gear module and still fit
+within the target 24mm case.
+
+Note this gives;
+
+sun1 teeth = 8
+sun2 teeth = 7
+
+
+## Gear Efficiency
+
+https://khkgears.net/new/gear_knowledge/gear-nomenclature/gear-efficiency.html
+
+The following study was really interesting, as it overturns lots of other
+conventional wisdom about gear efficiency;
+
+https://www.geartechnology.com/low-loss-gears
+
+Among the conclusions are that small module, large pressure angle, large
+face width, and increased helix all contribute to a more efficient gear.
+
+I'd previously read that large pressure angles were less efficient due to the
+forces being more transverse to the the direction of rotation, putting more
+load on bearings etc. However, it turns out bearing losses are less then gear
+friction losses. Also helical gears are meant to be less efficient than
+straight spur gears, but it turns out transverse contact ratio hurts more. And
+face width doesn't affect power losses at all.
+
+Apparently high pressure angles reduce the coefficient of friction (due to
+larger radius of curvature on the tooth face), and strengthen the tooth so you
+can reduce the module and transverse contact ratio more. Helical angle does
+increase losses, but it also gives you axial contact ratio, and increasing the
+face width gives you even more, so you can reduce the transverse contact ratio
+below 1.0 even, and that saves more than it costs.
+
+Thinking about this it makes sense; high contact ratios means a long line of
+action during which the teeth slide against each other meshing. A larger
+module means wider and longer teeth, also giving a longer line of action,
+and increasing the sliding distance in and out along the tooth. It is the
+sliding in and out of "mesh" that has all the friction that burns energy, so
+the "deeper the mesh", the more energy it burns.
+
+The highest relative sliding velocities are at the ends of the line of action,
+so even though helical gears increase the axial contact points and thus amount
+of sliding, it means you can reduce the transverse contact ratio/length and
+still having enough contact points for a strong mesh. So you can swap out
+high-speed sliding transverse contact at the ends of the line of action for
+more low-speed sliding axial contact in the middle of the line of action.
+
+### Value symbolic names
+
+These recommendations include helical gears and uses a different scheme for
+the value names. We should standardize on the following;
+
+For symbols, we use these prefixes;
+
+* D is a diameter
+* R is a radius
+* P is a pitch
+* B is a helix angle
+* m is a module
+* a is a pressure angle
+* z is number of teeth
+* s is a tooth thickness factor
+* h is a tooth height factor
+* b is a tooth face width
+* x is a profile shift
+* L is a contact path length
+* E is a contact ratio
+
+and these suffixes;
+
+* no suffix or t for transverse parameters (in axial rotation plane)
+* n for normal parameters (in helical tooth profile plane)
+* x for axial parameters (in direction of axis of rotation).
+* a is addendum (tip) related
+* f is dedendum (root) related
+* b is base circle related
+* p or no suffix for pitch-circle related
+* h is helix related
+* 1,2 is for gear1,gear2
+
+This gives values like;
+
+* D pitch circle diameter (transverse)
+* Db base circle diameter (transverse)
+* Da addendum diameter (transverse)
+* Df dedendum diameter (transverse)
+* R pitch radius
+* Rb base radius
+* Ra addendum (tip) radius
+* Rf dedendum (root) radius
+* Pt transverse pitch
+* Pb transverse base pitch
+* Pn normal pitch
+* Pbn normal base pitch
+* Pbn normal base pitch
+* Ph helix pitch length
+* Px helix axial pitch
+* m is transverse module (tooth profile on the side of gear)
+* mn normal module (tooth profile as cut across the helix)
+* Lt is the transverse contact path length
+* La is the transverse addendum contact path length.
+* Lhavg is the average helix contact length (tooth face contact length).
+* Lhmin  is the minimum helix contact length (tooth face contact length).
+* Lxavg is the average axial contact length (face contact length along the
+width of the gear).
+* Lxmin is the minimum axial contact length (tooth face contact length).
+
+And there are relationships between these values like;
+
+* Dp = m*z
+* Db = Dp*cos(a)
+* Rp = pi*z/2
+* Rb = Rp*cos(a)
+* Ra = Rp + ha*m = (z/2+ha)*m
+* Rf = Rp - hf*m = (z/2-hf)*m
+* m = D/z
+* mn = m*cos(B)
+* Bb = atan(Db/Dp*tan(B)) = atan(cos(a)*tan(B))
+* Pt = pi*Dp/z = pi*m
+* Ph = pi*Dp/tan(B)
+* Px = pi*mn*cos(an)/sin(Bb) = pi*mn/sin(B) = Pt/tan(B) = pi*m/tan(B) = Ph/z
+* Pn = Pt*cos(B)
+* Pb = pi*Db/z = pi*mn = pi*m*cos(a)
+* Pbn = pi*D*cos(a)/z = pi*mn*cos(an)
+* an = atan(tan(a)*cos(B))
+* a = atan(tan(an)/cos(B))
+
+Note helix angle changes with radius, so is less at the base circle than
+it is at the pitch circle.
+
+
+### Helical gears
+
+"normal" typically refers to parameters measured perpendicular to the tooth
+helix, and "transverse" to parameters measured perpendicular to the axis of
+rotation. This is because tooth profile cutting tools are designed for
+standard module sizes and cut the "normal" profile. However, for 3D printing
+we are not constrained by cutting tools, and it's easier to design everything
+using the transverse profile, because otherwise gear diameter changes whenever
+the helix angle is changed.
+
+https://drivetrainhub.com/notebooks/gears/geometry/Chapter%203%20-%20Helical%20Gears.html
+
+### Contact ratio
+
+Transverse contact ratio is average number of teeth in contact over the path of action
+line.
+
+https://drivetrainhub.com/notebooks/gears/geometry/Chapter%203%20-%20Helical%20Gears.html#Contact
+https://www.marplesgears.com/2019/02/contact-ratio-of-gears/
+
+CR = LA/Pb
+Lt = sqrt(Ra1^2 - Rb1^2) + sqrt(Ra2^2 - Rb2^2) - (R1+R2)*sin(a0)
+Pb = 2*Rb*pi/z
+
+Where
+
+CR is the contact ratio
+LA is the line of action length.
+Pb is the base pitch (distance between teeth at the base circle)
+Ra1 is the addendum radius of gear 1
+Rb1 is the base radius of gear1 
+Ra2 is the addendum radius of gear 2
+Rb2 is the base radius of gear 2
+R1 is the pitch circle radius of gear 1
+R2 is the pitch circle radius of gear 2
+B is helix angle
+
+a is the transverse pressure angle of the tooth profile.
+an is normal pressure angle of tooth profile.
+
+
+Dp
+Db
+
+Pb is base pitch
+
+Rb = Rp*cos(a)
+
+Rb is base circle radius = Rp*cos(at)
+Rp is pitch circle radius
+Ra is tip cicle radius
+Rf
+
+ha = addendum coeficient = 1.0
+hf = dedendum coeficient = 1.25
+
+hw = ha1 + ha2
+
+hw is working height (height of contacted portion of teeth).
+ha1 is addendum height of gear1
+ha2 is addendum height of gear2
+
+### Profile shifting
+
+https://drivetrainhub.com/notebooks/gears/geometry/Chapter%202%20-%20Spur%20Gears.html
+
