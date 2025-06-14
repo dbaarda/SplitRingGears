@@ -217,8 +217,9 @@ m_stdII = [
     0.15, 0.25, 0.35, 0.45, 0.55, 0.7, 0.75, 0.9, 1.125, 1.1375, 1.75, 2.25,
     2.75, 3.5, 4.5, 5.5, 7.0, 9.0]
 
-# Practical gear and module min and max values.
-Tmin, Tmax = 8, 1000
+# Practical gear and module min and max values. Tmin=4 is not really
+# practical, but is the minimum physically possible idler size with no shaft.
+Tmin, Tmax = 4, 1000
 Mmin, Mmax = 0.1, 10.0
 Mtol = 0.0005
 Mdef = 1.0
@@ -643,7 +644,7 @@ def TLimits(cm=Mdef, Dint=None, Dext=None, tmin=Tmin, tmax=Tmax, smin=2):
   return tmin,tmax,smin
 
 
-def iterRPS(cr=None, cp=None, cs=None, n=3,
+def iterRPS(cr=None, cp=None, cs=None, n=3, spr=inf,
     rsm=True, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     tmin=Tmin, tmax=Tmax, smin=2):
   """Iterate through r,p,s values matching constraints.
@@ -653,6 +654,7 @@ def iterRPS(cr=None, cp=None, cs=None, n=3,
     cp: constraint for p planet gear sizes.
     cs: constraint for s sun gear sizes.
     n: number of planets.
+    spr: max sun to planet ratio.
     rsm: ring and sun must mesh correctly.
     rpc: ring and planet must be coprime.
     psc: planet and sun must be coprime.
@@ -668,7 +670,8 @@ def iterRPS(cr=None, cp=None, cs=None, n=3,
   rr = TrRange(rs=rs, n=n, tmin=tmin, tmax=tmax, smin=smin)
   for r in iterIConstraint(cr,*rr):
     nr += 1
-    rp = TpRange(rr=r, rs=rs, n=n, tmin=tmin, tmax=tmax, smin=smin)
+    rp = (ceil(r/(2+spr)), tmax)
+    rp = TpRange(rr=r, rp=rp, rs=rs, n=n, tmin=tmin, tmax=tmax, smin=smin)
     for p in iterIConstraint(cp, *rp):
       np += 1
       s = r - 2*p
@@ -755,14 +758,14 @@ def iter2M(r, p, s, r2, p2, s2, cm, cm2, Dint=None, Dext=None, mmin=Mmin,mmax=Mm
   # tested {nm2} m2 ranges, and yielded {ny} m values.''')
 
 
-def iterRPSM(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None,
+def iterRPSM(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None, spr=inf,
     rsm=False, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     tmin=Tmin, tmax=Tmax, smin=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
   # Default smin=tmin, but if rsm is false assume no sun gear and default smin=2.
   if smin is None: smin = tmin if rsm else 2
   nrps = ny = 0
   tmin, tmax, smin = TLimits(cm, Dint, Dext, tmin, tmax, smin)
-  for r,p,s in iterRPS(cr, cp, cs, n, rsm, rpc, psc, rnc, rnf, rnb, tmin, tmax, smin):
+  for r,p,s in iterRPS(cr, cp, cs, n, spr, rsm, rpc, psc, rnc, rnf, rnb, tmin, tmax, smin):
     nrps += 1
     for m in iterM(r, p, s, cm, Dint, Dext, mmin, mmax, mtol):
         ny += 1
@@ -776,7 +779,7 @@ def iterRPSM(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None,
 
 
 def iterRPS2M(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
-    cm=Mdef, cm2=None, Dint=None, Dext=None,
+    cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rsm=False, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rs2m=False, rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
     tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
@@ -786,7 +789,7 @@ def iterRPS2M(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
   nrps = nrps2 = nm = ny = 0
   t2min, t2max, s2min = TLimits(cm2, Dint, Dext, tmin, tmax, s2min)
   tmin, tmax, smin = TLimits(cm, Dint, Dext, tmin, tmax, smin)
-  for r,p,s in iterRPS(cr, cp, cs, n, rsm, rpc, psc, rnc, rnf, rnb, tmin, tmax, smin):
+  for r,p,s in iterRPS(cr, cp, cs, n, spr, rsm, rpc, psc, rnc, rnf, rnb, tmin, tmax, smin):
     nrps += 1
     for r2,p2,s2 in iterRPS2(r, p, s, cr2, cp2, cs2, n,
         rs2m, rp2c, ps2c, rn2c, rn2f, rn2b, pp2e, t2min, t2max, s2min):
@@ -821,7 +824,7 @@ def iterSGears(cs=None, cp=None, cm=0.5, R=None, psc=False, tmin=Tmin, tmax=Tmax
           yield g
 
 
-def iterPGears(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None,
+def iterPGears(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None, spr=inf,
     rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     tmin=Tmin, tmax=Tmax, smin=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
   """ Iterate through all valid planetary gear combinations within constraints.
@@ -834,7 +837,7 @@ def iterPGears(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None,
 
   """
   rsm=True
-  for r,p,s,m in iterRPSM(cr, cp, cs, n, cm, Dint, Dext,
+  for r,p,s,m in iterRPSM(cr, cp, cs, n, cm, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, tmin, tmax, smin, mmin, mmax, mtol):
     g=PGears(Tr=r,Tp=p,Ts=s,np=n,m=m)
     assert Dint is None or g.Dint >= Dint, f'failed {g.Dint=} >= {Dint} for {g=!s}.'
@@ -844,11 +847,11 @@ def iterPGears(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None,
 
 
 def iterSRGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
-    cm=Mdef, cm2=None, Dint=None, Dext=None,
+    cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rsm=False, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rs2m=False, rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
     tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
-  for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext,
+  for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, rs2m, rp2c, ps2c, rn2c, rn2f, rn2b, pp2e,
       tmin, tmax, smin, s2min, mmin, mmax, mtol):
     g=SRGears(Tr=r,Tp=p,Ts=s,Tr2=r2,Tp2=p2,Ts2=s2,np=n,m=m)
@@ -861,12 +864,12 @@ def iterSRGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
 
 
 def iterSRPGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
-    cm=Mdef, cm2=None, Dint=None, Dext=None,
+    cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rs2m=False, rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
     tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
   rsm=True
-  for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext,
+  for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, rs2m, rp2c, ps2c, rn2c, rn2f, rn2b, pp2e,
       tmin, tmax, smin, s2min, mmin, mmax, mtol):
     g=SRPGears(Tr=r,Tp=p,Ts=s,Tr2=r2,Tp2=p2,Ts2=s2,np=n,m=m)
@@ -879,12 +882,12 @@ def iterSRPGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
 
 
 def iterSRIGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
-    cm=Mdef, cm2=None, Dint=None, Dext=None,
+    cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
     tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
   rsm=rs2m=True
-  for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext,
+  for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, rs2m, rp2c, ps2c, rn2c, rn2f, rn2b, pp2e,
       tmin, tmax, smin, s2min, mmin, mmax, mtol):
     g=SRIGears(Tr=r,Tp=p,Ts=s,Tr2=r2,Tp2=p2,Ts2=s2,np=n,m=m)
@@ -1112,6 +1115,8 @@ relationship constraints are booleans. Other constraints are floats or ints.
       help='Maximum ring gear external diameter in mm (eg "64.0").')
   cmdline.add_argument('-Dint', type=float,
       help='Minimum sun gear or middle gap internal diameter in mm (eg "25.0").')
+  cmdline.add_argument('-spr', type=float,
+      help='Maximum sun gear to planet size ratio (eg "-spr=1.0" means sun cannot be larger than planet.')
   cmdline.add_argument('--rpc', action=argparse.BooleanOptionalAction, default=False,
       help='Do the ring and planet gears need to be coprime?')
   cmdline.add_argument('--psc', action=argparse.BooleanOptionalAction, default=False,
@@ -1147,10 +1152,10 @@ relationship constraints are booleans. Other constraints are floats or ints.
   igears = globals()[f'iter{args.G}Gears']
   gearargs = dict(
       S='p s m Dext Dint psc tmin tmax smin'.split(),
-      P='r p s n m Dext Dint rpc psc rnc rnf rnb tmin tmax smin'.split(),
+      P='r p s n m Dext Dint spr rpc psc rnc rnf rnb tmin tmax smin'.split(),
       SR='r p s r2 p2 s2 n m m2 Dext Dint rpc rnc rnf rnb rp2c rn2c rn2f rn2b pp2e tmin tmax'.split(),
-      SRP='r p s r2 p2 s2 n m m2 Dext Dint rpc psc rnc rnf rnb rp2c rn2c rn2f rn2b pp2e tmin tmax smin s2min'.split(),
-      SRI='r p s r2 p2 s2 n m m2 Dext Dint rpc psc rnc rnf rnb rp2c ps2c rn2c rn2f rn2b pp2e tmin tmax smin s2min'.split())
+      SRP='r p s r2 p2 s2 n m m2 Dext Dint spr rpc psc rnc rnf rnb rp2c rn2c rn2f rn2b pp2e tmin tmax smin s2min'.split(),
+      SRI='r p s r2 p2 s2 n m m2 Dext Dint spr rpc psc rnc rnf rnb rp2c ps2c rn2c rn2f rn2b pp2e tmin tmax smin s2min'.split())
   argnames = dict(r='cr',p='cp',s='cs',r2='cr2',p2='cp2',s2='cs2',m='cm',m2='cm2')
 
   kwargs={argnames.get(k,k):v for (k,v) in vars(args).items() if v is not None and k in gearargs[args.G]}
