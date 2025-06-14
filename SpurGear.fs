@@ -36,21 +36,50 @@ export enum GearFilletType
     FULL
 }
 
+// These are the scaling multipliers the GearFilletType values map to.
+const GEAR_FILLET_VALUES = {
+        GearFilletType.NONE : 0,
+        GearFilletType.QUARTER : 1 / 2,
+        GearFilletType.THIRD : 2 / 3,
+        GearFilletType.FULL : 1,
+    };
+
 //This is used for both addendum and dedendum factors.
-export enum GearDendumFactor
+export enum GearDendumType
 {
-    annotation { "Name" : "1.00 x Module" }
+    annotation { "Name" : "1.00" }
     D000,
-    annotation { "Name" : "1.157 x Module" }
+    annotation { "Name" : "1.157" }
     D157,
-    annotation { "Name" : "1.20 x Module" }
+    annotation { "Name" : "1.20" }
     D200,
-    annotation { "Name" : "1.25 x Module" }
-    D250
+    annotation { "Name" : "1.25" }
+    D250,
+    annotation { "Name" : "Custom" }
+    DCUSTOM
 }
+
+// These are the dendum factor values the GearDendumType types map to.
+const GEAR_DENDUM_VALUES = {
+        GearDendumType.D000 : 1.0,
+        GearDendumType.D157 : 1.157,
+        GearDendumType.D200 : 1.2,
+        GearDendumType.D250 : 1.25,
+    };
+
+// These are the dendum types that the GearDendumType factor values map to.
+const GEAR_DENDUM_TYPES = {
+        1.0 : GearDendumType.D000,
+        1.157 : GearDendumType.D157,
+        1.2 : GearDendumType.D200,
+        1.25 : GearDendumType.D250,
+    };
 
 export enum GearChamferType
 {
+    annotation { "Name" : "Factor and angle",
+            "Description" : "Chamfer distance as a multiple of module." }
+    FACTOR_ANGLE,
     annotation { "Name" : "Equal distance" }
     EQUAL_OFFSETS,
     annotation { "Name" : "Two distances" }
@@ -59,63 +88,62 @@ export enum GearChamferType
     OFFSET_ANGLE
 }
 
-const TEETH_BOUNDS =
-{
+const TEETH_BOUNDS = {
             (unitless) : [4, 25, 1000]
         } as IntegerBoundSpec;
 
-const PRESSURE_ANGLE_BOUNDS =
-{
+const PRESSURE_ANGLE_BOUNDS = {
             (degree) : [12, 20, 45]
         } as AngleBoundSpec;
 
-const MODULE_BOUNDS =
-{
+const MODULE_BOUNDS = {
             (meter) : [1e-5, 0.001, 500],
             (centimeter) : 0.1,
             (millimeter) : 1.0,
             (inch) : 0.04
         } as LengthBoundSpec;
 
-const CENTERHOLE_BOUNDS =
-{
+const DENDUM_FACTOR_BOUNDS = {
+            (unitless) : [0.1, 1.0, 2.0]
+        } as RealBoundSpec;
+
+const CENTERHOLE_BOUNDS = {
             (meter) : [1e-5, 0.01, 500],
             (centimeter) : 1.0,
             (millimeter) : 10.0,
             (inch) : 0.375
         } as LengthBoundSpec;
 
-const KEY_BOUNDS =
-{
+const KEY_BOUNDS = {
             (meter) : [1e-5, 0.003, 500],
             (centimeter) : 0.3,
             (millimeter) : 3.0,
             (inch) : 0.125
         } as LengthBoundSpec;
 
-const CHAMFER_ANGLE_BOUNDS =
-{
+const CHAMFER_ANGLE_BOUNDS = {
             (degree) : [0.1, 60, 179.9]
         } as AngleBoundSpec;
 
-const CHAMFER_BOUNDS =
-{
+const CHAMFER_FACTOR_BOUNDS = {
+            (unitless) : [0.01, 0.5, 4.0]
+        } as RealBoundSpec;
+
+const CHAMFER_BOUNDS = {
             (meter) : [1e-5, 0.0005, 500],
             (centimeter) : 0.05,
             (millimeter) : 0.5,
             (inch) : 0.02
         } as LengthBoundSpec;
 
-const BACKLASH_BOUNDS =
-{
+const BACKLASH_BOUNDS = {
             (meter) : [-500, 0.0, 500],
             (centimeter) : 0,
             (millimeter) : 0,
             (inch) : 0
         } as LengthBoundSpec;
 
-const HELIX_ANGLE_BOUNDS =
-{
+const HELIX_ANGLE_BOUNDS = {
             (degree) : [5, 15, 45]
         } as AngleBoundSpec;
 
@@ -189,19 +217,26 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                         "Description" : "A positive value adds clearance between all meshing faces" }
             isLength(definition.backlash, BACKLASH_BOUNDS);
 
-            annotation { "Name" : "Dedendum", "Default" : GearDendumFactor.D250, "UIHint" : "SHOW_LABEL" }
-            definition.dedendumFactor is GearDendumFactor;
+            annotation { "Name" : "Dedendum", "Default" : GearDendumType.D250, "UIHint" : "SHOW_LABEL",
+                        "Description" : "How deep the teeth root is from the pitch circle as a multiple of the module." }
+            definition.dedendumType is GearDendumType;
 
-            annotation { "Name" : "Addendum", "Default" : GearDendumFactor.D000, "UIHint" : "SHOW_LABEL" }
-            definition.addendumFactor is GearDendumFactor;
+            if (definition.dedendumType == GearDendumType.DCUSTOM)
+            {
+                annotation { "Name" : "Factor", "Default" : 1.25 }
+                isReal(definition.dedendumFactor, DENDUM_FACTOR_BOUNDS);
 
-            annotation { "Name" : "Root radius",
-                        "Description" : "A positive value adds more clearance at the root" }
-            isLength(definition.offsetClearance, ZERO_DEFAULT_LENGTH_BOUNDS);
+            }
 
-            annotation { "Name" : "Tip radius",
-                        "Description" : "A negative value reduces the outside diameter of the gear" }
-            isLength(definition.offsetDiameter, ZERO_DEFAULT_LENGTH_BOUNDS);
+            annotation { "Name" : "Addendum", "Default" : GearDendumType.D000, "UIHint" : "SHOW_LABEL",
+                        "Description" : "How high the teeth tip is from the pitch cicle as a multiple of the module." }
+            definition.addendumType is GearDendumType;
+
+            if (definition.addendumType == GearDendumType.DCUSTOM)
+            {
+                annotation { "Name" : "Factor", "Default" : 1.0 }
+                isReal(definition.addendumFactor, DENDUM_FACTOR_BOUNDS);
+            }
 
             annotation { "Name" : "Clocking angle",
                         "Description" : "Adjust this value to mesh gear trains in a Part Studio" }
@@ -234,10 +269,18 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
         {
             annotation { "Group Name" : "Chamfer", "Collapsed By Default" : false, "Driving Parameter" : "chamfer" }
             {
-                annotation { "Name" : "Chamfer type", "Default" : GearChamferType.OFFSET_ANGLE }
+                annotation { "Name" : "Chamfer type", "Default" : GearChamferType.OFFSET_ANGLE, "UIHint" : "ALWAYS_HIDDEN" }
                 definition.chamferType is GearChamferType;
 
-                if (definition.chamferType != GearChamferType.TWO_OFFSETS)
+                annotation { "Name" : "Gear chamfer type", "Default" : GearChamferType.FACTOR_ANGLE }
+                definition.gearChamferType is GearChamferType;
+
+                if (definition.gearChamferType == GearChamferType.FACTOR_ANGLE)
+                {
+                    annotation { "Name" : "Factor", "Description" : "Chamfer distance is Factor x Module" }
+                    isReal(definition.chamferFactor, CHAMFER_FACTOR_BOUNDS);
+                }
+                else if (definition.gearChamferType != GearChamferType.TWO_OFFSETS)
                 {
                     annotation { "Name" : "Distance" }
                     isLength(definition.width, CHAMFER_BOUNDS);
@@ -248,19 +291,20 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
                     isLength(definition.width1, CHAMFER_BOUNDS);
                 }
 
-                if (definition.chamferType == GearChamferType.OFFSET_ANGLE ||
-                    definition.chamferType == GearChamferType.TWO_OFFSETS)
+                if (definition.gearChamferType == GearChamferType.OFFSET_ANGLE ||
+                    definition.gearChamferType == GearChamferType.TWO_OFFSETS)
                 {
                     annotation { "Name" : "Opposite direction", "Default" : false, "UIHint" : "OPPOSITE_DIRECTION" }
                     definition.oppositeDirection is boolean;
                 }
 
-                if (definition.chamferType == GearChamferType.TWO_OFFSETS)
+                if (definition.gearChamferType == GearChamferType.TWO_OFFSETS)
                 {
                     annotation { "Name" : "Distance 2" }
                     isLength(definition.width2, CHAMFER_BOUNDS);
                 }
-                else if (definition.chamferType == GearChamferType.OFFSET_ANGLE)
+                else if (definition.gearChamferType == GearChamferType.FACTOR_ANGLE ||
+                    definition.gearChamferType == GearChamferType.OFFSET_ANGLE)
                 {
                     annotation { "Name" : "Angle" }
                     isAngle(definition.angle, CHAMFER_ANGLE_BOUNDS);
@@ -329,25 +373,9 @@ export const SpurGear = defineFeature(function(context is Context, id is Id, def
             }
         }
 
-        var addendumFactor = 1.00;
-        if (definition.addendumFactor == GearDendumFactor.D157)
-            addendumFactor = 1.157;
-        if (definition.addendumFactor == GearDendumFactor.D200)
-            addendumFactor = 1.2;
-        else if (definition.addendumFactor == GearDendumFactor.D250)
-            addendumFactor = 1.25;
-
-        var dedendumFactor = 1.25;
-        if (definition.dedendumFactor == GearDendumFactor.D000)
-            dedendumFactor = 1.0;
-        else if (definition.dedendumFactor == GearDendumFactor.D157)
-            dedendumFactor = 1.157;
-        else if (definition.dedendumFactor == GearDendumFactor.D200)
-            dedendumFactor = 1.2;
-
         var gearData = { "center" : vector(0, 0) * meter };
-        gearData.addendum = addendumFactor * definition.module + definition.offsetDiameter;
-        gearData.dedendum = dedendumFactor * definition.module + definition.offsetClearance;
+        gearData.addendum = definition.addendumFactor * definition.module;
+        gearData.dedendum = definition.dedendumFactor * definition.module;
         gearData.pitchRadius = definition.pitchDiameter / 2;
         gearData.outerRadius = gearData.pitchRadius + gearData.addendum;
         gearData.innerRadius = gearData.pitchRadius - gearData.dedendum;
@@ -625,11 +653,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
         const rootFilletEdges = qClosestTo(qNonCapEntity(toothId, EntityType.EDGE), sketchPlane.origin);
         var rootFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "rfillet") }).radius;
 
-        if (definition.rootFillet == GearFilletType.THIRD)
-            rootFilletRadius /= 1.5;
-        else if (definition.rootFillet == GearFilletType.QUARTER)
-            rootFilletRadius /= 2;
-
+        rootFilletRadius *= GEAR_FILLET_VALUES[definition.rootFillet];
         opFillet(context, id + "rfillet", {
                     "entities" : rootFilletEdges,
                     "radius" : rootFilletRadius
@@ -641,11 +665,7 @@ function createTooth(context is Context, id is Id, definition is map, gearData i
         const tipFilletEdges = qClosestTo(qNonCapEntity(toothId, EntityType.EDGE), planeToWorld(sketchPlane, middleOuterPoint));
         var tipFilletRadius = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "toothSketch", EntityType.EDGE, "tfillet") }).radius;
 
-        if (definition.tipFillet == GearFilletType.THIRD)
-            tipFilletRadius /= 1.5;
-        else if (definition.tipFillet == GearFilletType.QUARTER)
-            tipFilletRadius /= 2;
-
+        tipFilletRadius *= GEAR_FILLET_VALUES[definition.tipFillet];
         opFillet(context, id + "tfillet", {
                     "entities" : tipFilletEdges,
                     "radius" : tipFilletRadius
@@ -741,13 +761,44 @@ export function editGearLogic(context is Context, id is Id, oldDefinition is map
     else if (definition.GearInputType == GearInputType.PITCH_DIAMETER && definition.module != definition.pitchDiameter / definition.numTeeth)
         definition.module = definition.pitchDiameter / definition.numTeeth;
 
-    // Correct settings relationships if they are wrong.
+    // Correct pitch settings relationships if they are wrong.
     if (definition.diametralPitch != inch / definition.module)
         definition.diametralPitch = inch / definition.module;
     if (definition.circularPitch != definition.module * PI)
         definition.circularPitch = definition.module * PI;
     if (definition.pitchDiameter != definition.numTeeth * definition.module)
         definition.pitchDiameter = definition.numTeeth * definition.module;
+
+    // Correct chamfer settings relationships if they are wrong.
+    if (definition.gearChamferType == GearChamferType.FACTOR_ANGLE)
+    {
+        definition.chamferType = GearChamferType.OFFSET_ANGLE;
+        if (definition.width != definition.module * definition.chamferFactor)
+            definition.width = definition.module * definition.chamferFactor;
+        if (!definition.oppositeDirection)
+        {
+            definition.oppositeDirection = true;
+            definition.angle = 90 * degree - definition.angle;
+        }
+    }
+    else
+    {
+        definition.chamferType = definition.gearChamferType;
+        if (definition.oppositeDirection)
+            definition.chamferFactor = definition.width / definition.module;
+        else
+            definition.chamferFactor = tan(definition.angle) * definition.width / definition.module;
+    }
+
+    // Set addendum and dedendum type from factor, or factor from type.
+    if (definition.addendumFactor != oldDefinition.addendumFactor)
+        definition.addendumType = GEAR_DENDUM_TYPES[definition.addendumFactor] ?? GearDendumType.DCUSTOM;
+    else if (definition.addendumType != oldDefinition.addendumType)
+        definition.addendumFactor = GEAR_DENDUM_VALUES[definition.addendumType] ?? definition.addendumFactor;
+    if (definition.dedendumFactor != oldDefinition.dedendumFactor)
+        definition.dedendumType = GEAR_DENDUM_TYPES[definition.dedendumFactor] ?? GearDendumType.DCUSTOM;
+    else if (definition.dedendumType != oldDefinition.dedendumType)
+        definition.dedendumFactor = GEAR_DENDUM_VALUES[definition.dedendumType] ?? definition.dedendumFactor;
 
     return definition;
 }
