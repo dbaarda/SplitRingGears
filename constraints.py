@@ -17,7 +17,7 @@ import re
 from math import inf
 from collections.abc import Iterable,Iterator
 from numbers import Number
-from copy import deepcopy
+from copy import copy
 import argparse
 
 Imin,Imax = -2**31,2**31
@@ -128,7 +128,7 @@ def RangeValue(r):
 
 
 def isConstraint(cv, t=Number):
-  """Is cv a valid Constraint?."""
+  """Is cv a valid Constraint for type t?."""
   if cv is None or isinstance(cv, (Number,tuple)):
     return isRange(cv, t)
   elif isinstance(cv, set):
@@ -167,7 +167,10 @@ def iterConstraint(cv, vmin=Vmin, vmax=Vmax, vtol=0):
   added.
 
   Note this copies iterators so they are not consumed, allowing you to iterate
-  through the same cv multiple times.
+  through the same cv multiple times. Unfortunately most iterators cannot be
+  copied, so this will raise TypeError when it tries, which is better than
+  silently consuming the iterator and changing the result for subsequent
+  evaluations.
   """
   if cv is None or isinstance(cv, (Number, tuple)):
     rv = Range(cv, vmin, vmax, vtol)
@@ -211,7 +214,10 @@ def iterIConstraint(ci, imin=Imin, imax=Imax):
   imax values are an inclusive range-tuple limit.
 
   Note this copies iterators so they are not consumed, allowing you to iterate
-  through the same ci value multiple times.
+  through the same ci multiple times. Unfortunately most iterators cannot be
+  copied, so this will raise TypeError when it tries, which is better than
+  silently consuming the iterator and changing the result for subsequent
+  evaluations.
   """
   for r0,r1 in iterConstraint(ci, imin, imax, 0):
     for v in range(r0,r1+1):
