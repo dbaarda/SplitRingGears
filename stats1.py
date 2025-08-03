@@ -29,11 +29,11 @@ class Sample(object):
     if data:
       self.update(data)
 
-  def add(self, v):
+  def add(self, v, n=1):
     """Add a value."""
-    self.num += 1
-    self.sum += v
-    self.sum2 += v*v
+    self.num += n
+    self.sum += v*n
+    self.sum2 += v*v*n
     self.min = min(self.min, v)
     self.max = max(self.max, v)
 
@@ -63,7 +63,7 @@ class Sample(object):
   def __str__(self):
     """Get a simple string rendering of the stats."""
     if self.num:
-      return f'num={self.num} sum={self.sum:g} min/avg/max/dev={self.min:g}/{self.avg:g}/{self.max:g}/{self.dev:g}'
+      return f'num={self.num:g} sum={self.sum:g} min/avg/max/dev={self.min:g}/{self.avg:g}/{self.max:g}/{self.dev:g}'
     else:
       return "num=0 sum=0"
 
@@ -138,10 +138,10 @@ class Histogram(Sample):
       bmin, bmax, c = bmax, self._getbound(i+1), self.data[i]
       yield bmin, bmax, c
 
-  def add(self, v):
+  def add(self, v, n=1):
     """Add a value."""
-    super().add(v)
-    self.data[self._getindex(v)] += 1
+    super().add(v, n)
+    self.data[self._getindex(v)] += n
 
 
 if __name__ == '__main__':
