@@ -511,8 +511,43 @@ There are a few options on how these can be arranged;
 
 ## Onshape SpurGear.fs
 
-There is a Spur Gear feature in Onshape.
+There is a Spur Gear feature in Onshape. Actually, there are many gear
+featurescripts;
 
+* [Spur Gear - Custom feature](
+https://cad.onshape.com/documents/5742c8cde4b06c68b362d748/w/b493e0cb681bbf9497d9f4b3/e/01a666571e625f8b819fd75b)
+  * Only does spur gears, helica and herringbone
+  * Official Onshape feature.
+  * Fully public source.
+* [GearLabFS](https://cad.onshape.com/documents/f349bdd78c53f3325055aefc/w/161d6a507877f1872b55c2b4/e/53214cbff7d86d5817cf8efb)
+  ([forum
+  discusion](https://forum.onshape.com/discussion/18686/gear-lab-cylindrical-bevel-face-gears))
+    * has nice support for "inheriting" gear parameters and placement from the gear it
+      meshes with.
+    * Does nearly every type of gear: cylindrical, bevel, helical, inner,
+      outer. Not worm gears?
+    * Sadly bevel and possibly helical gear math is flawed, as explained on
+      the forum.
+    * Sadly much of the implementation is private.
+* [Gear
+Designer](https://cad.onshape.com/documents/db73276df7574c7e29b36a0a/v/75ffeaca38e6357b4b1f0b3e/e/8939b2d6675e0257aaa00fdf)
+  * Does only bevel and spur gears, but correctly. Also does helical and herringbone but
+    has a weird "helical shift" setting instead of helix angle.
+  * Sadly implementation is private.
+
+Sadly all of these have flaws that make them non-ideal for my application. The
+absence of internal gear support can be kind-of worked around by using the
+external gear and making a negative. Unfortunately this means the external
+gear needs the tip-root fillets and addendum-dedendum distances inverted, and
+it's not possible to do that with the official Spur Gear, and I think the
+other Gears do this incorrectly for internal gears.
+
+For this reason I've forked the offical Spur Gear and released it here;
+
+https://cad.onshape.com/documents/398504e1cabca3abfcaa15e3/w/a5219c13997de77f0dedf950/e/362561dc150d4cef514ae2b9
+
+This includes a heap of improvements and adds a Ring Gear configurable part
+that can be just used.
 
 ## Onshape Split Ring Gear
 
@@ -733,7 +768,7 @@ CR is the contact ratio
 LA is the line of action length.
 Pb is the base pitch (distance between teeth at the base circle)
 Ra1 is the addendum radius of gear 1
-Rb1 is the base radius of gear1 
+Rb1 is the base radius of gear1
 Ra2 is the addendum radius of gear 2
 Rb2 is the base radius of gear 2
 R1 is the pitch circle radius of gear 1
@@ -768,4 +803,3 @@ ha2 is addendum height of gear2
 ### Profile shifting
 
 https://drivetrainhub.com/notebooks/gears/geometry/Chapter%202%20-%20Spur%20Gears.html
-
