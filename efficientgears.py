@@ -367,7 +367,7 @@ def optGears(g1, g2, Et=0.5, Ex=1.0, m=None, a=None, b=None):
     z1,z2,m = g1.z, g2.z, g1.m
   else:
     z1,z2,m = adjustm(g1,g2,m)
-  if a is None: a = g1.m
+  if a is None: a = g1.a
   if b is None: b = g1.b
   hx = b/m
   B = optB(Ex,hx)
