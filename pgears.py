@@ -69,8 +69,8 @@ harmonic       30~300     2000~6000     80~90%     10~30arcsec      low
 splitring      10~4000    1000~6000     86~95%?    15~45arcmin?     high
 
 Note that splitring can give a very high ratio in a single stage, so it could
-give better efficiency and less backlash than multi-staging other other types
-of gearbox to achieve the same ratios. However it's efficiency is reported to
+give better efficiency and less backlash than multi-staging other types of
+gearbox to achieve the same ratios. However it's efficiency is reported to
 suffer because it has high torque loads on the relatively high-speed planet
 gears which creates higher losses compared to other gearboxes where the high
 torques are only on the slow moving gears. However it's not clear of those
@@ -217,17 +217,26 @@ m_stdII = [
     0.15, 0.25, 0.35, 0.45, 0.55, 0.7, 0.75, 0.9, 1.125, 1.1375, 1.75, 2.25,
     2.75, 3.5, 4.5, 5.5, 7.0, 9.0]
 
-# Practical gear and module min and max values. Tmin=4 is not really
-# practical, but is the minimum physically possible idler size with no shaft.
-Tmin, Tmax = 4, 1000
-Mmin, Mmax = 0.1, 10.0
-Mtol = 0.0005
-Mdef = 1.0
+# These are the module-wide default gear dimension limits;.
+#
+# * Tmin, Tmax, Smin: min and max, and special sun-min gear teeth limits.
+# * Mmin, Mmax, Mdef: min, max, and default gear module.
+# * Mtol: tolerance limit for matching gear module values.
+#
+# These can be (re)set with setLimits().
+def setLimits(tmin=4,tmax=1000,smin=None,mmin=0.1,mmax=10.0,mdef=1.0,mtol=0.0005):
+  """ Set the module wide default gear dimension limits. """
+  # Tmin=4 is not really practical, but is the minimum physically possible
+  # idler size with no shaft.
+  if smin is None: smin=tmin
+  global Tmin, Tmax, Smin, Mmin, Mmax, Mdef, Mtol
+  Tmin, Tmax, Smin, Mmin, Mmax, Mdef, Mtol = tmin, tmax, smin, mmin, mmax, mdef, mtol
 
+# Set the initial default gear limits.
+setLimits()
 
 def iscoprime(i1,i2):
   return gcd(i1, i2) == 1
-
 
 def clamp(v,vmin,vmax):
   """Clamp a value between vmin and vmax."""
@@ -249,49 +258,43 @@ def gearstr(name, T, m=1.0):
   return f'{name}({T=}, {D=:.3f}mm {m=:.3f}mm)'
 
 
-def intD(T, m=1.0, ring=False):
+def intD(T, m=1.0, ring=False, ha=1.0, hf=1.25):
   """Get the inside diameter of a gear from the size and module."""
-  if ring:
-    return round((T - 2)*m, 3)
-  return round((T - 2*1.25)*m, 3)
+  h = ha if ring else hf
+  return round((T - 2*h)*m, 3)
 
 
-def extD(T, m=1.0, ring=False):
+def extD(T, m=1.0, ring=False, ha=1.0, hf=1.25):
   """Get the outside diameter of a gear from the size and module."""
-  if ring:
-    return round((T+2*1.25)*m, 3)
-  return round((T+2)*m, 3)
+  h = hf if ring else ha
+  return round((T + 2*h)*m, 3)
 
 
-def extT(D, m=1.0, ring=False):
+def extT(D, m=1.0, ring=False, ha=1.0, hf=1.25):
   """Get the gear size from the outside diameter and module."""
-  if ring:
-    return floor(D/m - 2*1.25)
-  return floor(D/m-2)
+  h = hf if ring else ha
+  return floor(D/m - 2*h)
 
 
-def intT(D, m=1.0, ring=False):
+def intT(D, m=1.0, ring=False, ha=1.0, hf=1.25):
   """Get the gear size from the inside diameter and module."""
-  if ring:
-    return floor(D/m + 2)
-  return floor(D/m + 2*1.25)
+  h = ha if ring else hf
+  return floor(D/m + 2*h)
 
 
-def extM(D, T, ring=False):
+def extM(D, T, ring=False, ha=1.0, hf=1.25):
   """Get the module from the gear size and outside diameter."""
-  if ring:
-    return ffloor(D/(T + 2*1.25), 3)
-  return ffloor(D/(T + 2), 3)
+  h = hf if ring else ha
+  return ffloor(D/(T + 2*h), 3)
 
 
-def intM(D, T, ring=False):
+def intM(D, T, ring=False, ha=1.0, hf=1.25):
   """Get the module from the gear size and inside diameter."""
-  if ring:
-    return fceil(D/(T - 2), 3)
-  return fceil(D/(T - 2*1.25), 3)
+  h = ha if ring else hf
+  return fceil(D/(T - 2*h), 3)
 
 
-def maxTp(rmax=Tmax, smax=Tmax, n=3):
+def maxTp(rmax=None, smax=None, n=3):
   """Get pmax given rmax and/or smax and n.
 
   The calculation for Tp from Ts or Tr with planets just not touching given
@@ -301,6 +304,8 @@ def maxTp(rmax=Tmax, smax=Tmax, n=3):
   s*Ts - 2 = (1-s)*Tp                  s*Tr - 2 = (1+s)*Tp
   Tp = (s*Ts - 2)/(1-s)                Tp = (s*Tr - 2)/(1+s)
   """
+  if rmax is None: rmax=Tmax
+  if smax is None: smax=Tmax
   # handle n==2 to avoid division by zero.
   if n == 2:
     return (rmax-2)//2
@@ -308,21 +313,25 @@ def maxTp(rmax=Tmax, smax=Tmax, n=3):
   return min(floor((rmax*s-2)/(1+s)), floor((smax*s-2)/(1-s)))
 
 
-def minTr(pmin=Tmin, n=3):
+def minTr(pmin=None, n=3):
   """Get rmin given pmin and n."""
+  if pmin is None: pmin=Tmin
   s = sin(pi/n)
   return ceil((pmin*(1+s)+2)/s)
 
 
-def minTs(pmin=Tmin, n=3):
+def minTs(pmin=None, n=3):
   """Get smin given pmin and n."""
+  if pmin is None: pmin=Tmin
   s = sin(pi/n)
   return ceil((pmin*(1-s)+2)/s)
 
 
-def assertTValid(T, tmin=Tmin, tmax=Tmax):
-  assert isinstance(T, int), f'Invalid type: T={T!r} is not an int.'
-  assert tmin <= T <= tmax, f'Invalid value: {T=} violates {tmin} <= T <= {tmax}.'
+def assertTValid(T, tmin=None, tmax=None, name='T'):
+  if tmin is None: tmin = Tmin
+  if tmax is None: tmax = Tmax
+  assert isinstance(T, int), f'Invalid type: {name}={T!r} is not an int.'
+  assert tmin <= T <= tmax, f'Invalid value: {name}={T} violates {tmin} <= {name} <= {tmax}.'
 
 
 class SGears(object):
@@ -330,7 +339,8 @@ class SGears(object):
   Ts : int  # number of sun gear teeth
   Tp : int  # number of planet gear teeth
 
-  def __init__(self, Ts, Tp, m:float=Mdef):
+  def __init__(self, Ts, Tp, m=None):
+    if m is None: m = Mdef
     self.Ts, self.Tp, self.m = Ts, Tp, m
 
   def __str__(self):
@@ -366,16 +376,14 @@ class CGears(SGears):
     if Tr is None and Tp and Ts: Tr = Ts + 2*Tp
     if Tp is None and Tr and Ts: Tp = (Tr - Ts)//2
     if Ts is None and Tr and Tp: Ts = Tr - 2*Tp
-    assert isinstance(Tr, int), f'Invaid type: Tr={Tr!r} is not int.'
-    assert isinstance(Tp, int), f'Invaid type: Tp={Tp!r} is not int.'
-    assert isinstance(Ts, int), f'Invaid type: Ts={Ts!r} is not int.'
-    assert Tmin <= Tr <= Tmax, f'Invalid size: {Tr=} violates {Tmin}<=T<={Tmax}.'
-    assert Tmin <= Tp <= Tmax, f'Invalid size: {Tp=} violates {Tmin}<=T<={Tmax}.'
+    assertTValid(Tr, name='Tr')
+    assertTValid(Tp, name='Tp')
     assert Tr == Ts + 2*Tp, f'Invalid sizes: {Tr=},{Tp=},{Ts=} violates Tr=Ts+2*Tp.'
     assert Tp <= maxTp(rmax=Tr, n=np), f'Invalid sizes: {Tr=},{Tp=},{np=} violates Tp+2<(Tr-Tp)*sin(pi/np).'
     return Tr,Tp,Ts
 
-  def __init__(self, Tr=None, Tp=None, Ts=None, np:int=3, m:float=Mdef, **kwargs):
+  def __init__(self, Tr=None, Tp=None, Ts=None, np:int=3, m=None, **kwargs):
+    if m is None: m=Mdef
     Tr, Tp, Ts = CGears.assertValid(Tr=Tr, Tp=Tp, Ts=Ts, np=np, **kwargs)
     self.Tr, self.Tp, self.Ts, self.np, self.m = Tr, Tp, Tr-2*Tp, np, m
 
@@ -426,11 +434,11 @@ class PGears(CGears):
   @classmethod
   def assertValid(cls, Tr=None, Tp=None, Ts=None, np=3, **kwargs):
     Tr, Tp, Ts = super().assertValid(Tr=Tr, Tp=Tp, Ts=Ts, np=np, **kwargs)
-    assert Tmin <= Ts <= Tmax, f'Invalid size: {Ts=} violates {Tmin}<=T<={Tmax}.'
+    assertTValid(Ts, name='Ts', tmin=Smin)
     assert (Tr+Ts) % np == 0, f'Invalid mesh: {Tr=},{Ts=},{np=} violates (Tr+Ts)%np=0.'
     return Tr,Tp,Ts
 
-  def __init__(self, Tr=None, Tp=None, Ts=None, np:int=3, m:float=Mdef, **kwargs):
+  def __init__(self, Tr=None, Tp=None, Ts=None, np:int=3, m=None, **kwargs):
     Tr, Tp, Ts = PGears.assertValid(Tr=Tr, Tp=Tp, Ts=Ts, np=np, **kwargs)
     super().__init__(Tr=Tr, Tp=Tp, Ts=Ts, np=np, m=m, **kwargs)
 
@@ -469,7 +477,7 @@ class SRGears(CGears):
     assert Tp + dp == Tp2, f'Conflicting args: {Tp=}, {Tp2=}, {dp=} violates Tp2=Tp+dp.'
     return Tr,Tp,Ts,dr,dp
 
-  def __init__(self, Tr=None, Tp=None, Ts=None, Tr2=None, Tp2=None, Ts2=None, dr=None, dp=None, np=3, m=Mdef, **kwargs):
+  def __init__(self, Tr=None, Tp=None, Ts=None, Tr2=None, Tp2=None, Ts2=None, dr=None, dp=None, np=3, m=None, **kwargs):
     Tr, Tp, Ts, dr, dp = SRGears.assertValid(Tr=Tr, Tp=Tp, Ts=Ts, Tr2=Tr2, Tp2=Tp2, Ts2=Ts2, dr=dr, dp=dp, np=np, **kwargs)
     super().__init__(Tr=Tr, Tp=Tp, Ts=Ts, Tr2=Tr2, Tp2=Tp2, Ts2=Ts2, dr=dr, dp=dp, np=np, m=m, **kwargs)
     self.dr, self.dp = dr, dp
@@ -581,7 +589,7 @@ class SRIGears(SRPGears):
     return prefix + f',\n  {s2})'
 
 
-def TpRange(rr=None, rp=None, rs=None, n=3, tmin=Tmin, tmax=Tmax, smin=None):
+def TpRange(rr=None, rp=None, rs=None, n=3, tmin=None, tmax=None, smin=None):
   """Get the (pmin,pmax) range from rr, rp, and rs ranges.
 
   The rr, rp, and rs arguments can be None for max range, a number for a fixed
@@ -598,6 +606,8 @@ def TpRange(rr=None, rp=None, rs=None, n=3, tmin=Tmin, tmax=Tmax, smin=None):
   (smin,tmax), so you can set smin=2 for SRGears that don't have a sun gear
   but requre the planets not to touch in the middle.
   """
+  if tmin is None: tmin = Tmin
+  if tmax is None: tmax = Tmax
   if smin is None: smin = tmin
   rmin,rmax = IRange(rr, smin+2*tmin, tmax)
   pmin,pmax = IRange(rp, tmin, (rmax-smin)//2)
@@ -608,36 +618,41 @@ def TpRange(rr=None, rp=None, rs=None, n=3, tmin=Tmin, tmax=Tmax, smin=None):
   return pmin,pmax
 
 
-def TsRange(rr=None, rp=None, rs=None, n=3, tmin=Tmin, tmax=Tmax, smin=None):
+def TsRange(rr=None, rp=None, rs=None, n=3, tmin=None, tmax=None, smin=None):
   """Get the (smin,smax) range from rr, rp, and rs ranges."""
+  if tmin is None: tmin = Tmin
+  if tmax is None: tmax = Tmax
   if smin is None: smin = tmin
-  rmin,rmax = IRange(rr, smin+2*tmin, tmax)
-  pmin,pmax = IRange(rp, tmin, (rmax-smin)//2)
-  smin,smax = IRange(rs, smin, rmax-2*pmin)
-  smin = max(minTs(pmin,n), rmin-2*pmax, smin)
-  smax = min(rmax-2*pmin, smax)
+  pmin,pmax = TpRange(rr, rp, rs, n, tmin, tmax, smin)
+  rmin,rmax = IRange(rr, smin+2*pmin, tmax)
+  smin,smax = IRange(rs, max(minTs(pmin,n), rmin-2*pmax, smin), rmax-2*pmin)
   return smin,smax
 
 
-def TrRange(rr=None, rp=None, rs=None, n=3, tmin=Tmin, tmax=Tmax, smin=None):
+def TrRange(rr=None, rp=None, rs=None, n=3, tmin=None, tmax=None, smin=None):
   """Get the (smin,smax) range from rr, rp, and rs ranges."""
+  if tmin is None: tmin = Tmin
+  if tmax is None: tmax = Tmax
   if smin is None: smin = tmin
-  rmin,rmax = IRange(rr, smin+2*tmin, tmax)
-  pmin,pmax = IRange(rp, tmin, (rmax-smin)//2)
-  smin,smax = IRange(rs, smin, rmax-2*pmin)
-  rmin = max(minTr(pmin,n), smin+2*pmin, rmin)
-  rmax = min(smax+2*pmax, rmax)
+  pmin,pmax = TpRange(rr, rp, rs, n, tmin, tmax, smin)
+  smin,smax = IRange(rs, smin, tmax-2*pmin)
+  rmin,rmax = IRange(rr, max(minTr(pmin,n), smin+2*pmin), min(smax+2*pmax, tmax))
   return rmin,rmax
 
 
-def MRange(r, s, rm=None, Dint=None, Dext=None, mmin=Mmin, mmax=Mmax):
+def MRange(r, s, rm=None, Dint=None, Dext=None, mmin=None, mmax=None):
   """ Get the (mmin,mmax) range from r, s, rm, Dint, and Dext."""
+  if mmin is None: mmin=Mmin
+  if mmax is None: mmax=Mmax
   if Dint: mmin = max(intM(Dint, s, ring=False), mmin)
   if Dext: mmax = min(extM(Dext, r, ring=True), mmax)
   return Range(rm,mmin,mmax)
 
 
-def TLimits(cm=Mdef, Dint=None, Dext=None, tmin=Tmin, tmax=Tmax, smin=2):
+def TLimits(cm=Mdef, Dint=None, Dext=None, tmin=None, tmax=None, smin=None):
+  if tmin is None: tmin = Tmin
+  if tmax is None: tmax = Tmax
+  if smin is None: smin = tmin
   mmin,mmax = ConstraintRange(cm, Mmin, Mmax)
   if Dext: tmax = min(extT(Dext, mmin), tmax)
   if Dint: smin = max(intT(Dint, mmax), smin)
@@ -646,7 +661,7 @@ def TLimits(cm=Mdef, Dint=None, Dext=None, tmin=Tmin, tmax=Tmax, smin=2):
 
 def iterRPS(cr=None, cp=None, cs=None, n=3, spr=inf,
     rsm=True, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
-    tmin=Tmin, tmax=Tmax, smin=2):
+    tmin=None, tmax=None, smin=None):
   """Iterate through r,p,s values matching constraints.
 
   Args:
@@ -696,7 +711,7 @@ def iterRPS(cr=None, cp=None, cs=None, n=3, spr=inf,
 
 def iterRPS2(r, p, s, cr2=None, cp2=None, cs2=None, n=3,
     rs2m=False, rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
-    tmin=Tmin, tmax=Tmax, smin=2):
+    tmin=None, tmax=None, smin=None):
   """Iterate through r2,p2,s2,rm2 values matching constraints.
 
   Args:
@@ -733,13 +748,15 @@ def iterRPS2(r, p, s, cr2=None, cp2=None, cs2=None, n=3,
   # tested {nrps2} r2,p2,s2 sizes, and yielded {ny} r2,p2,s2 sizes.''')
 
 
-def iterM(r, p, s, cm, Dint=None, Dext=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
+def iterM(r, p, s, cm, Dint=None, Dext=None, mmin=None, mmax=None, mtol=None):
+  if mtol is None: mtol = Mtol
   mmin,mmax = MRange(r, s, Dint=None, Dext=None, mmin=mmin, mmax=mmax)
   for rm in iterConstraint(cm, mmin, mmax, mtol):
     yield RangeValue(rm)
 
 
-def iter2M(r, p, s, r2, p2, s2, cm, cm2, Dint=None, Dext=None, mmin=Mmin,mmax=Mmax,mtol=Mtol):
+def iter2M(r, p, s, r2, p2, s2, cm, cm2, Dint=None, Dext=None, mmin=None,mmax=None,mtol=None):
+  if mtol is None: mtol = Mtol
   nm2 = ny = 0
   m2min,m2max = MRange(r2, s2, Dint=Dint, Dext=Dext, mmin=mmin, mmax=mmax)
   mmin,mmax = MRange(r, s, Dint=Dint, Dext=Dext, mmin=mmin, mmax=mmax)
@@ -760,7 +777,7 @@ def iter2M(r, p, s, r2, p2, s2, cm, cm2, Dint=None, Dext=None, mmin=Mmin,mmax=Mm
 
 def iterRPSM(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None, spr=inf,
     rsm=False, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
-    tmin=Tmin, tmax=Tmax, smin=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
+    tmin=None, tmax=None, smin=None, mmin=None, mmax=None, mtol=None):
   # Default smin=tmin, but if rsm is false assume no sun gear and default smin=2.
   if smin is None: smin = tmin if rsm else 2
   nrps = ny = 0
@@ -782,7 +799,7 @@ def iterRPS2M(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
     cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rsm=False, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rs2m=False, rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
-    tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
+    tmin=None, tmax=None, smin=None, s2min=None, mmin=None, mmax=None, mtol=None):
   # Default smin=tmin, but if rsm is false assume no sun gear and default smin=2.
   if smin is None: smin = tmin if rsm else 2
   if s2min is None: s2min = tmin if rs2m else 2
@@ -809,13 +826,15 @@ def iterRPS2M(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
   # tested {nrps} r,p,s sizes, {nrps2} r2,p2,s2 sizes, and yielded {ny} results.""")
 
 
-def iterSGears(cs=None, cp=None, cm=0.5, R=None, psc=False, tmin=Tmin, tmax=Tmax):
+def iterSGears(cs=None, cp=None, cm=0.5, R=None, psc=False, tmin=None, tmax=None):
   """ Iterate through gear pairs that satisfy constraints.
 
   The Ts and Tp constraints are the sizes of the first and second gear as an
   int, a (min,max) range tuple, or an iterable of ints or range-tuples. The
   psc argument can be set true to require the sizes be coprime.
   """
+  if tmin is None: tmin = Tmin
+  if tmax is None: tmax = Tmax
   for s in iterIConstraint(cs,tmin,tmax):
     for p in iterIConstraint(cp,tmin,tmax):
       if not psc or iscoprime(p,s):
@@ -826,7 +845,7 @@ def iterSGears(cs=None, cp=None, cm=0.5, R=None, psc=False, tmin=Tmin, tmax=Tmax
 
 def iterPGears(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None, spr=inf,
     rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
-    tmin=Tmin, tmax=Tmax, smin=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
+    tmin=None, tmax=None, smin=None, mmin=None, mmax=None, mtol=None):
   """ Iterate through all valid planetary gear combinations within constraints.
 
   This yields all possible valid PGears instances within the cr, cp, cs, n,
@@ -836,6 +855,7 @@ def iterPGears(cr=None, cp=None, cs=None, n=3, cm=Mdef, Dint=None, Dext=None, sp
   diameter.
 
   """
+  if mtol is None: mtol = Mtol
   rsm=True
   for r,p,s,m in iterRPSM(cr, cp, cs, n, cm, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, tmin, tmax, smin, mmin, mmax, mtol):
@@ -850,7 +870,8 @@ def iterSRGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
     cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rsm=False, rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rs2m=False, rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
-    tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
+    tmin=None, tmax=None, smin=None, s2min=None, mmin=None, mmax=None, mtol=None):
+  if mtol is None: mtol = Mtol
   for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, rs2m, rp2c, ps2c, rn2c, rn2f, rn2b, pp2e,
       tmin, tmax, smin, s2min, mmin, mmax, mtol):
@@ -867,7 +888,8 @@ def iterSRPGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
     cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rs2m=False, rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
-    tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
+    tmin=None, tmax=None, smin=None, s2min=None, mmin=None, mmax=None, mtol=None):
+  if mtol is None: mtol = Mtol
   rsm=True
   for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, rs2m, rp2c, ps2c, rn2c, rn2f, rn2b, pp2e,
@@ -885,7 +907,8 @@ def iterSRIGears(cr=None, cp=None, cs=None, cr2=None, cp2=None, cs2=None, n=3,
     cm=Mdef, cm2=None, Dint=None, Dext=None, spr=inf,
     rpc=False, psc=False, rnc=False, rnf=False, rnb=False,
     rp2c=False, ps2c=False, rn2c=False, rn2f=False, rn2b=False, pp2e=False,
-    tmin=Tmin, tmax=Tmax, smin=None, s2min=None, mmin=Mmin, mmax=Mmax, mtol=Mtol):
+    tmin=None, tmax=None, smin=None, s2min=None, mmin=None, mmax=None, mtol=None):
+  if mtol is None: mtol = Mtol
   rsm=rs2m=True
   for r,p,s,r2,p2,s2,m in iterRPS2M(cr, cp, cs, cr2, cp2, cs2, n, cm, cm2, Dint, Dext, spr,
       rsm, rpc, psc, rnc, rnf, rnb, rs2m, rp2c, ps2c, rn2c, rn2f, rn2b, pp2e,
