@@ -1,6 +1,20 @@
 #!/bin/python3
 from math import *
 
+def solve(f, x0=-1.0e9, x1=1.0e9, e=1.0e-9):
+ """ Solve f(x)=0 for x where x0<=x<=x1 within +-e. """
+ y0, y1 = f(x0), f(x1)
+ # y0 and y1 must have different sign.
+ assert y0*y1 <= 0
+ while (x1 - x0) > e:
+   xm = (x0 + x1) / 2.0
+   ym = f(xm)
+   if y0*ym > 0:
+     x0,y0 = xm,ym
+   else:
+     x1,y1 = xm,ym
+ return x0
+
 
 def d2r(d):
   """Convert degrees to radians."""
@@ -51,7 +65,7 @@ class Gear(object):
   B : float  # helix angle.
   ha : float # addendum factor.
   hf : float # dedendum factor.
-  hx : float # tooth face width factor.
+  hx : float # thickness factor.
 
   def __init__(self, z:int, m:float=1.0, a:float=20.0, B:float=0.0, ha:float=1.0, hf:float=1.25, hx:float=1.0):
     self.z, self.m, self.a, self.B, self.ha, self.hf, self.hx = z, m, a, B, ha, hf, hx
@@ -67,31 +81,31 @@ class Gear(object):
 
   @property
   def b(self):
-    """Get the tooth face width."""
+    """Get the tooth face width (gear thickness)."""
     return self.m*self.hx
 
   @property
   def Dp(self):
-    """Get the pitch radius from size and module."""
+    """Get the pitch diameter from size and module."""
     return self.z*self.m
 
   @property
   def Db(self):
-    """Get the base radius from the size, module, and pressure angle. """
+    """Get the base diameter from the size, module, and pressure angle. """
     return self.Dp*cosd(self.a)
 
   @property
   def Da(self):
-    """Get the tip radius from addendum factor ha."""
+    """Get the tip diameter from addendum factor ha."""
     return self.Dy(self.ha)
 
   @property
   def Df(self):
-    """Get the root radius from dedendum factor hf."""
+    """Get the root diameter from dedendum factor hf."""
     return self.Dy(-self.hf)
 
   def Dy(self, hy):
-    """Get the radius at an arbitary hight-factor hy from the pitch circle."""
+    """Get the diameter at an arbitary hight-factor hy from the pitch circle."""
     return (self.z + 2*hy) * self.m
 
   @property
@@ -130,7 +144,7 @@ class Gear(object):
 
   @property
   def Px(self):
-    """ Get the axial pitch."""
+    """ Get the axial pitch from the helix angle."""
     try:
       return self.Pp/tand(self.B)
     except:
@@ -175,6 +189,7 @@ class Gear(object):
     try:
       return acosd(self.Rb/self.Ry(hy))
     except:
+      # Ry(hy) is less than Rb.
       return 0
 
   @property
@@ -192,7 +207,7 @@ class Gear(object):
 
     This is the contact line length from the mid-pitch point to where the
     addendum disengages. It does not depend on the size of the other gear, and
-    the sum of engaging gear's L1 is the total transverse contact line length.
+    the summing La for both gears is the total transverse contact line length.
     """
     return sqrt(self.Ra**2 - self.Rb**2) - self.Rp * sind(self.a)
 
@@ -211,7 +226,7 @@ class Gear(object):
 
     This is the contact ratio for the contact line length from the mid-pitch
     point to where the addendum disengages. It does not depend on the size of
-    the other gear and summing E1 for meshing gears gives the total transverse
+    the other gear and summing Ea for meshing gears gives the total transverse
     contact ratio.
     """
     return self.La/self.Pb
@@ -244,7 +259,7 @@ class Gear(object):
     nx = (ex-e) % 1
     cxavg = self.Cxavg(g2)
     if self.B == 0:
-      return cxavg*(1 - nt/et)
+      return cxavg*(1 - nt/et) # == floor(et-e)*b
     elif nt+nx <= 1:
       return cxavg*(1 - nt*nx/(et*ex))
     else:
@@ -262,7 +277,7 @@ def optB(ex, hx):
   """Get the required helix angle for the target axial contact ratio ex for a given gear widthfactor hx=b/m."""
   return atand(ex*pi/hx)
 
-def optWf(ex, B=15):
+def opthx(ex, B=15):
   """ Get optimum width factor for the target axial contact ratio ex from helix angle B."""
   return eb*pi/tand(B)
 
@@ -272,44 +287,33 @@ def optha(z, et, a=20):
   The optimum is with both gears having the same addendum transverse contact
   ratio and the total transverse contact ratio being at the target ha (e).
   """
-  ea = et/2
-  rp = z/2
-  rb = rp*cosd(a)
-  return sqrt((ea*pi*cosd(a) + rp*sind(a))**2 + rb**2) - rp
+  # For m=1 to simplify things.
+  Ea = et/2
+  Rp = z/2
+  Pp = pi
+  return sqrt((Ea*Pp*cosd(a))**2 + Rp*(Ea*Pp*sind(2*a) + Rp)) - Rp
 
 def opta(z, et, ha=1):
   """ Get optimum pressure angle (a) for the target transverse contact ratio (et) and addendum factor (ha)."""
   # This gets a bit hard...
-  # aet=et/2
-  # rp = z/2
-  # ra = rp + ha
-  # rb = rp*cos(a)
-  # le = sqrt(ra**2 - rb**2) # length of line of action from base circle to adendum disengagement point.
-  # lp = rp*sind(a) = sqrt(rp^2 - rb^2)  # length of line of action from base cicle to the middle pitch-point.
-  # aet = sqrt(ra^2 - rb^2) - sqrt(rp^2 - rb^2)
-  # aet = ra*sin(a+b) - rp*sin(a)
+  #
+  # From the optha() eqn above we have;
+  #
+  # ha = sqrt((Ea*Pp*cosd(a))**2 + Rp*(Ea*Pp*sind(2*a) + Rp)) - Rp
+  # ha = sqrt((Ea*Pp*cosd(a))**2 + Rp*(Ea*Pp*2*sind(a)*cosd(a) + Rp)) - Rp
+  # (ha - Rp)^2 = (Ea*Pp*cosd(a))**2 + Rp*(Ea*Pp*2*sind(a)*cosd(a) + Rp)
+  # (ha - Rp)^2 = (Ea*Pp*cosd(a))**2 + 2*Rp*Ea*Pp*sind(a)*cosd(a) + Rp^2
+  # ha^2 - 2*ha*Rp = (Ea*Pp*cosd(a))**2 + 2*Rp*Ea*Pp*sind(a)*cosd(a)
+  # ha*(ha - 2*Rp) = (Ea*Pp*cosd(a))**2 + 2*Rp*Ea*Pp*sind(a)*cosd(a)
+  # ha*(ha - 2*Rp)/(Ea*Pp) = (Ea*Pp*cosd(a)^2 + 2*Rp*sind(a)*cosd(a)
+  # ha*(ha - 2*Rp)/(Ea*Pp) = cosd(a)*(Ea*Pp*cosd(a) + 2*Rp*sind(a))
+  # ha*(ha - Dp)/(Ea*Pp) = cosd(a)*(Ea*Pp*cosd(a) + Dp*sind(a))
+  #
+  # This eqn make all the symbolic solvers struggle, so just solve #
+  # numerically, but note that for most z,et, only a narrow range of ha values
+  # have a solution.
+  return solve(lambda a: optha(z,et,a) - ha, 0.0, 45.0)
 
-
-  # # need to solve for rb, then a = acos(rb/rp) or solve for lp and a = asin(lp/rp)
-  # aet^2 = ra^2 - rb^2 + rp^2 - rb^2 - 2*sqrt((ra^2 - rb^2)*(rp^2 - rb^2))
-  #       = ra^2 + rp^2 - 2*rb^2  - 2*sqrt((ra*rp)^2 - (ra*rb)^2 - (rb*rp)^2 + rb^4))
-  #       = ra^2 + rp^2 - 2*rb^2  - 2*sqrt((ra*rp)^2 - (ra*rb)^2 - (rb*rp)^2 + rb^4))
-
-
-  # # aet = (le - rp*sin(a))/ pi*cosd(a)
-  # # aet*pi*cos(a) = le - rp*sin(a)
-  # # le = aet*pi*cos(a) + rp*sin(a)
-  # rp = z/2
-  # ra = rp + ha
-  # aet = (sqrt(ra^2 - (rp*cos(a))^2) - rp*sin(a)) / (pi*cos(a))
-  # aet*pi*cos(a) = sqrt(ra^2 - (rp*cos(a))^2) - rp*sin(a)
-
-  # R = sqrt((aet*pi)^2 + rp^2)
-  # b = atan(aet*pi/rp)
-  # le = R*sin(a+b)
-  # a + b = asin(le/R)
-  # a = asin(le/R) - b
-  # return asin(sqrt((ra**2 - rb**2)/((aet*pi)^2 + rp^2)))/atan(aet*pi/rp))
 
 def optStats(z1, Et, Ex, m1=1, m2=None, a1=20, a2=None, B1=0, b1=4, b2=None):
   if b2 is None: b2=b1
@@ -345,7 +349,7 @@ def MeshStats(g1, g2):
   Lt = g1.Lt(g2)
   Ex, Et, E = g1.Ex, g1.Et(g2), g1.E(g2)
   Cxavg, Cxmin = g1.Cxavg(g2), g1.Cxmin(g2)
-  return f'{Lt=:.2f} {Et=:.2f} {Ex=:.2f} {E=:.2f} {Cxavg=:.2f} {Cxmin=:.2f}'
+  return f'{Lt=:.2f}={g1.La:.2f}+{g2.La:.2f} {Et=:.2f}={g1.Ea:.2f}+{g2.Ea:.2f} {Ex=:.2f} {E=:.2f} {Cxavg=:.2f} {Cxmin=:.2f}'
 
 def adjustm(g1, g2, m):
   """Get new z1,z2,m values when changing to a target m.
@@ -360,7 +364,7 @@ def adjustm(g1, g2, m):
   return z1, z2, m
 
 
-def optGears(g1, g2, Et=0.5, Ex=1.0, m=None, a=None, b=None):
+def optGears(g1, g2, Et=0.5, Ex=1.0, m=None, a=None, b=None, hx=None):
   """ Optimize a gear pair."""
   c = g1.Rp + g2.Rp
   if m is None:
@@ -369,7 +373,7 @@ def optGears(g1, g2, Et=0.5, Ex=1.0, m=None, a=None, b=None):
     z1,z2,m = adjustm(g1,g2,m)
   if a is None: a = g1.a
   if b is None: b = g1.b
-  hx = b/m
+  if hx is None: hx = b/m
   B = optB(Ex,hx)
   ha1,ha2 = optha(z1, Et, a), optha(z2,Et,a)
   hf1,hf2 = ha2+0.25, ha1+0.25
