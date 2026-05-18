@@ -549,24 +549,42 @@ https://cad.onshape.com/documents/398504e1cabca3abfcaa15e3/w/a5219c13997de77f0de
 This includes a heap of improvements and adds a Ring Gear configurable part
 that can be just used.
 
-## Onshape Split Ring Gear
+## Gearboxes Made
+
+![Gearboxes compared](photos/SR001-003_compare.jpg "Gearboxes 1 to 3 compared")
+
+### Onshape Split Ring Gear Design
+
+The sample gearboxes were all designed on OnShape, with the design available at;
 
 https://cad.onshape.com/documents/20f9c79862f9e146cf32354f/v/c195d1eac2888f9e323ba598/e/05de466a9d3c7a5d076da907?configuration=Enable_3D_Print_Bridges_%3Dfalse%3BGearDepth%3D0.004%2Bmeter%3BInput_Bolt_Diameter%3D0.002%2Bmeter%3BInput_Bolt_Pattern_Diameter%3D0.01%2Bmeter%3BInput_Bolt_Pattern_Number%3D4.0%3BList_3zy7YgDOqYAwHT%3DDefault%3BList_89ihjy7v5ZcINf%3DDefault%3BNum_Planets%3D3.0%3BOutput_Bolt_Diameter%3D0.002%2Bmeter%3BOutput_Bolt_Pattern_Diameter%3D0.01%2Bmeter%3BOutput_Bolt_Pattern_Number%3D4.0%3BPlanet1_Teeth%3D23.0%3BPlanet2_Teeth%3D21.0%3BRing1_Teeth%3D56.0%3BRing2_Teeth%3D52.0%3BStage1_Module%3D5.0E-4%2Bmeter%3BenableSun2Idler%3Dfalse&renderMode=0&uiState=682d5b06b675fa417cb7e972
 
-## Gearbox 1
+Note that the planets, carrier, and first-stage ring include markers to
+indicate their correct position for installation. These markers are pretty
+small, and initial designs they were a bit too small for the slicer to render
+well;
 
+![Planet mark model](photos/PlanetMarkModel.jpg) ![Planet mark sliced](photos/PlanetMarkSlice.jpg)
+![Ring mark model](photos/RingMarkModel.jpg) ![Rimg mark sliced](photos/RingMarkSlice.jpg)
+
+### Gearbox 1
+
+![Gearbox1 printed](photos/SR001_plate.jpg "Gearbox 1 printed parts") ![Gearbox1 weight](photos/SR001_weight.jpg "Gearbox 1 weight")
+![Gearbox1 height](photos/SR001_height.jpg "Gearbox 1 height") ![Gearbox1 width](photos/SR001_width.jpg "Gearbox 1 width")
+![Gearbox1 demo](photos/SR001_demo.mp4 "Gearbox 1 demo")
 
 First printed gearbox used;
 
-Num Planets: 3
-Stage1 Module: 0.5
-Ring1 teeth: 56
-Planet1 teeth: 23
-Ring2 teeth: 52
-Planet2 teeth: 21
-Gear Depth: 4mm
-Enable Sun2 Idler: false
-Ratio: 394.7
+* Num Planets: 3
+* Stage1 Module: 0.5
+* Ring1 teeth: 56
+* Planet1 teeth: 23
+* Sun1 teeth: 10
+* Ring2 teeth: 52
+* Planet2 teeth: 21
+* Gear Depth: 4mm
+* Enable Sun2 Idler: false
+* Ratio: 394.7
 
 This was the first choice for this search;
 
@@ -575,26 +593,37 @@ $ ./pgears.py -G=SRP --rpc --rp2c -m=0.5 -m2=0.5.. -s=10 -Dext=30 -R=400
 ```
 
 I had -s=10 because that's the gear on the Oribiter's standard stepper-motor,
-and -Dext=30 to make it fit within a 32mm diameter case.
+and -Dext=30 to try to make it fit within a 32mm diameter case. However,
+including the case it was closer to 34mm diameter.
 
-## Gearbox 2
+### Gearbox 2
+
+![Gearbox2 printed](photos/SR002_plate.jpg) ![Gearbox2 weight](photos/SR002_weight.jpg)
+![Gearbox2 height](photos/SR002_height.jpg) ![Gearbox2 width](photos/SR002_width.jpg)
+![Gearbox2 demo](photos/SR002_demo.mp4)
 
 The second printed gearbox used the same settings, but tweaked the design to
 be a bit smaller.
 
-## Geabox 3
+### Geabox 3
+
+![Gearbox3 printed](photos/SR003_plate.jpg) ![Gearbox3 weight](photos/SR003_weight.jpg)
+![Gearbox3 height](photos/SR003_height.jpg) ![Gearbox3 width](photos/SR003_width.jpg)
+![Gearbox3 demo](photos/SR003_demo.mp4)
 
 I wanted to try for something smaller but with an even higher ratio.
 
-Num Planets: 3
-Stage1 Module: 0.5
-Ring1 teeth: 34
-Planet1 teeth: 13
-Ring2 teeth: 29
-Planet2 teeth: 11
-Gear Depth: 3mm
-Enable Sun2 Idler: true
-Ratio: 659.75
+* Num Planets: 3
+* Stage1 Module: 0.5
+* Ring1 teeth: 34
+* Planet1 teeth: 13
+* Sun1 teeth = 8
+* Ring2 teeth: 29
+* Planet2 teeth: 11
+* Sun2 teeth = 7
+* Gear Depth: 3mm
+* Enable Sun2 Idler: true
+* Ratio: 659.75
 
 Found as first choice with;
 
@@ -607,11 +636,6 @@ least 8 teeth while requiring sun1 not be larger than planet1. Note this
 solution has an external ring dedendum of only 18.25mm, so will fit
 in a 21mm case. This means we could increase the gear module and still fit
 within the target 24mm case.
-
-Note this gives;
-
-sun1 teeth = 8
-sun2 teeth = 7
 
 
 ## Gear Efficiency
