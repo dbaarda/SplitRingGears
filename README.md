@@ -509,7 +509,9 @@ There are a few options on how these can be arranged;
    simplification of eliminating the carrier and bearings for the gears might
    be at the cost of efficiency.
 
-## Onshape SpurGear.fs
+## Onshape Design
+
+### Onshape SpurGear.fs
 
 There is a Spur Gear feature in Onshape. Actually, there are many gear
 featurescripts;
@@ -549,10 +551,6 @@ https://cad.onshape.com/documents/398504e1cabca3abfcaa15e3/w/a5219c13997de77f0de
 This includes a heap of improvements and adds a Ring Gear configurable part
 that can be just used.
 
-## Gearboxes Made
-
-![Gearboxes compared](photos/SR001-003_compare.jpg "Gearboxes 1 to 3 compared")
-
 ### Onshape Split Ring Gear Design
 
 The sample gearboxes were all designed on OnShape, with the design available at;
@@ -566,6 +564,14 @@ well;
 
 ![Planet mark model](photos/PlanetMarkModel.jpg) ![Planet mark sliced](photos/PlanetMarkSlice.jpg)
 ![Ring mark model](photos/RingMarkModel.jpg) ![Rimg mark sliced](photos/RingMarkSlice.jpg)
+
+## Gearboxes Made
+
+![Gearboxes compared](photos/SR001-003_compare.jpg "Gearboxes 1 to 3 compared")
+
+There are many more photos and vidio available at;
+
+https://photos.app.goo.gl/Vqs8ipUKxrRDY4BYA
 
 ### Gearbox 1
 
