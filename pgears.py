@@ -1100,12 +1100,21 @@ if __name__ == '__main__':
   import argparse,re
 
   cmdline = argparse.ArgumentParser(
-      description="Find gears for planetary and split-ring gears that satisfy constraints.",
-      epilog="""\
+      description="""\
+Find gears for planetary and split-ring gears that satisfy constraints.
+  
 Specify your target ratio with -R, your desired gear type with -G, and any
 other constraints you require with other arguments. Gear size and module
 constraints can be specified as lists of values or min..max ranges. Gear
 relationship constraints are booleans. Other constraints are floats or ints.
+""",
+      epilog="""\
+Example targeting 500:1 ratio, split-ring with secondary idler, primary and
+secondary hunting-tooth design (ring/planet and consequently planet/sun
+co-prime), 3 planets (default), min->max gear sizes 8->128 (default), primary
+and secondary module in range 0.5 to 1.5, max external diameter 21mm:
+
+$ pgears.py -R 500 -G SRI --rpc --rp2c -m=0.5..1.5 -m2=0.5..1.5 -Dext=21.0
 """,
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   cmdline.add_argument('-R', type=float, default=100000.0,
@@ -1115,7 +1124,7 @@ relationship constraints are booleans. Other constraints are floats or ints.
   cmdline.add_argument('-d', type=int, default=2,
       help='Ratio histogram buckets per order of magnitude.')
   cmdline.add_argument('-G', choices=['S', 'P', 'SR', 'SRP', 'SRI'], default="SRP",
-      help='Gear type: S:simple sun/planet, P=planetary, SR=split-ring, SRP=planetary split-ring. SRI=idler split-ring.')
+      help='Gear type: S:simple sun/planet, P=planetary, SR=split-ring without suns, SRP=split-ring with primary sun. SRI=split-ring with secondary sun idler.')
   cmdline.add_argument('-r', type=ConstraintType(Tmin, Tmax),
       help='Ring gear sizes or inclusive min..max ranges (eg "64", "24..32", "32,34,50..60".')
   cmdline.add_argument('-p', type=ConstraintType(Tmin, Tmax),
@@ -1141,23 +1150,23 @@ relationship constraints are booleans. Other constraints are floats or ints.
   cmdline.add_argument('-spr', type=float,
       help='Maximum sun gear to planet size ratio (eg "-spr=1.0" means sun cannot be larger than planet.')
   cmdline.add_argument('--rpc', action=argparse.BooleanOptionalAction, default=False,
-      help='Do the ring and planet gears need to be coprime?')
+      help='Do the ring and planet gears need to be coprime? Implies --psc, and --rnc if -n is odd. Contradicts --rnf if -n is not 2.')
   cmdline.add_argument('--psc', action=argparse.BooleanOptionalAction, default=False,
-      help='Do the planet and sun gears need to be coprime?')
+      help='Do the planet and sun gears need to be coprime? Implies --rpc, and --rnc if -n is odd. Contradicts --rnf if -n is not 2.')
   cmdline.add_argument('--rnc', action=argparse.BooleanOptionalAction, default=False,
-      help='Do the ring gear and number of planets need to be coprime?')
+      help='Do the ring gear and number of planets need to be coprime? Contradicts --rnf.')
   cmdline.add_argument('--rnf', action=argparse.BooleanOptionalAction, default=False,
-      help='Do ring gear and number of planets need to be a factor?')
+      help='Does the ring gear need to be a multiple of the number of planets? Contradicts --rnc, and --rpc if -n is not 2.')
   cmdline.add_argument('--rnb', action=argparse.BooleanOptionalAction, default=False,
       help='Do ring gear and planets need to be balanced?')
   cmdline.add_argument('--rp2c', action=argparse.BooleanOptionalAction, default=False,
-      help='Do the secondary ring and planet gears need to be coprime?')
+      help='Do the secondary ring and planet gears need to be coprime? Implies --ps2c, and --rn2c if -n is odd. Contradicts --rn2f if -n is not 2.')
   cmdline.add_argument('--ps2c', action=argparse.BooleanOptionalAction, default=False,
-      help='Do the secondary planet and sun gears need to be coprime?')
+      help='Do the secondary planet and sun gears need to be coprime? Implies --rp2c, and --rn2c if -n is odd. Contradicts --rn2f if -n is not 2.')
   cmdline.add_argument('--rn2c', action=argparse.BooleanOptionalAction, default=False,
-      help='Do the secondary ring gear and number of planets need to be coprime?')
+      help='Do the secondary ring gear and number of planets need to be coprime? Contradicts --rn2f.')
   cmdline.add_argument('--rn2f', action=argparse.BooleanOptionalAction, default=False,
-      help='Do the secondary ring gear and number of planets need to be a factor?')
+      help='Does the secondary ring gear need to be a multiple of the number of planets? Contradicts --rn2c, and --rp2c if -n is not 2.')
   cmdline.add_argument('--rn2b', action=argparse.BooleanOptionalAction, default=False,
       help='Do the secondary ring gear and planets need to be balanced?')
   cmdline.add_argument('--pp2e', action=argparse.BooleanOptionalAction, default=False,
