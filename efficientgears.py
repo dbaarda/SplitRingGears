@@ -279,7 +279,7 @@ def optB(ex, hx):
 
 def opthx(ex, B=15):
   """ Get optimum width factor for the target axial contact ratio ex from helix angle B."""
-  return eb*pi/tand(B)
+  return ex*pi/tand(B)
 
 def optha(z, et, a=20):
   """Get optimum addendum factor (ha) values for a gear for a transverse contact ratio (et) for a given pressure angle (a).
@@ -330,15 +330,6 @@ def optStats(z1, Et, Ex, m1=1, m2=None, a1=20, a2=None, B1=0, b1=4, b2=None):
   print(g2)
   print('---')
 
-def optSRP(Et, Ex, m=0.5, a=40, b=4):
-  hx=b/m
-  r1,p1,s1 = Gear(34,m=0.5,hx=8),Gear(13, m=0.5, hx=8),Gear(8, m=0.5, hx=8)
-  r2,p2,s2 = Gear(39, m=0.5, hx=8),Gear(11, m=0.5, hx=8),Gear(7, m=0.5, hx=8)
-  B=optB(Ex,hx)
-  r1_ha = optha(r1, Et, a)
-  p1_ha = optha(p1, Et, a)
-
-
 def MeshStats(g1, g2):
   assert g1.m == g2.m
   assert g1.a == g2.a
@@ -379,6 +370,40 @@ def optGears(g1, g2, Et=0.5, Ex=1.0, m=None, a=None, b=None, hx=None):
   hf1,hf2 = ha2+0.25, ha1+0.25
   return Gear(z1, m, a, B, ha1, hf1, hx), Gear(z2, m, a, B, ha2, hf2, hx)
 
+
+def optPGears(r, p, s, Et=1.0, Ex=1.0, m=None, a=None, b=None, hx=None):
+  """ Optimize a planetary Ring/Planet/Sun trio. """
+  assert (r.a == p.a == s.a)
+  assert (r.z == s.z + 2*p.z)
+  if m is None: m = r.m
+  if a is None: a = s.a
+  if b is None: b = s.b
+  if hx is None: hx = b/m
+  B = optB(Ex,hx)
+  r_ha, p_ha, s_ha = optha(r.z, Et, a), optha(p.z, Et, a), optha(s.z, Et, a)
+  r_hf, p_hf, s_hf = p_ha+0.25, s_ha+0.25, p_ha+0.25
+  return Gear(r.z, m, a, B, r_ha, r_hf, hx), Gear(p.z, m, a, B, p_ha, p_hf, hx), Gear(s.z, m, a, B, s_ha, s_hf, hx)
+
+def OptPGearsOut(n,r,p,s, Et=1.0, Ex=1.0, m=None, a=None, b=None, hx=None):
+  print(f'Optimizing SRP r{n} p{n} s{n} mesh with {Et=} {Ex=}:')
+  ro,po,so = optPGears(r, p, s, Et, Ex, m, a, b, hx)
+  print(f'  r{n} -> r{n}o={ro!s}')
+  print(f'  p{n} -> p{n}o={po!s}')
+  print(f'  s{n} -> s{n}o={so!s}')
+  print(f'  s{n}  + p{n}  = {MeshStats(s,p)}')
+  print(f'  s{n}o + p{n}o = {MeshStats(so,po)}')
+  print(f'  p{n}  + r{n}  = {MeshStats(p,r)}')
+  print(f'  p{n}o + r{n}o = {MeshStats(po,ro)}')
+  return ro,po,so
+
+def OptOut(n1,n2,g1,g2):
+  print(f'Optimizing {n1} + {n2} mesh:')
+  g1o,g2o = optGears(g1, g2, Et, Ex, m, a, b)
+  print(f'  {n1} -> {n1}o={g1o!s}')
+  print(f'  {n2} -> {n2}o={g2o!s}')
+  print(f'  {n1}  + {n2}  = {MeshStats(g1,g2)}')
+  print(f'  {n1}o + {n2}o = {MeshStats(g1o,g2o)}')
+
 b = 4.0
 m1 = 0.5
 m2 = m1*(34 - 13)/(29 - 11)
@@ -391,24 +416,17 @@ p2 = Gear(11, m=m2, hx=hx2)
 r2 = Gear(29, m=m2, hx=hx2)
 
 print('Optimizing the following gears.')
-print(f'{s1=!s}')
-print(f'{p1=!s}')
 print(f'{r1=!s}')
-print(f'{s2=!s}')
-print(f'{p2=!s}')
+print(f'{p1=!s}')
+print(f'{s1=!s}')
+ro6,_,_ = OptPGearsOut('1',r1,p1,s1, a=40, Et=0.6)
+ro8,_,_ = OptPGearsOut('1',r1,p1,s1, a=40, Et=0.8)
+ro1,_,_ = OptPGearsOut('1',r1,p1,s1, a=40, Et=1.0)
+
+print('Optimizing the following gears.')
 print(f'{r2=!s}')
-
-Et,Ex,m,a,b=0.6,1.0,0.5,40,4
-
-def OptOut(n1,n2,g1,g2):
-  print(f'Optimizing {n1} + {n2} mesh:')
-  g1o,g2o = optGears(g1, g2, Et, Ex, m, a, b)
-  print(f'  {n1} -> {n1}o={g1o!s}')
-  print(f'  {n2} -> {n2}o={g2o!s}')
-  print(f'  {n1}  + {n2}  = {MeshStats(g1,g2)}')
-  print(f'  {n1}o + {n2}o = {MeshStats(g1o,g2o)}')
-
-OptOut('s1', 'p1', s1, p1)
-OptOut('p1', 'r1', p1, r1)
-OptOut('s2', 'p2', s2, p2)
-OptOut('p2', 'r2', p2, r2)
+print(f'{p2=!s}')
+print(f'{s2=!s}')
+OptPGearsOut('2',r2,p2,s2, a=40, Et=0.6)
+OptPGearsOut('2',r2,p2,s2, a=40, Et=0.8)
+OptPGearsOut('2',r2,p2,s2, a=40, Et=1.0)
